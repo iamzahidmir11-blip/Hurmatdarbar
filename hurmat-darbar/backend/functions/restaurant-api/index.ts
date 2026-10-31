@@ -59,6 +59,7 @@ Deno.serve(async (req: Request) => {
     const roles = new Set((roleRows ?? []).map((row: { role: string }) => row.role));
 
     if (req.method === "GET") {
+      const view = new URL(req.url).searchParams.get("view") ?? "orders";
       const requestId = new URL(req.url).searchParams.get("request_id");
       if (view === "availability_status") {
         if (!isUuid(requestId)) return reply({ error: "invalid_request_id" }, 400);
