@@ -357,6 +357,15 @@ if(reservationForm)reservationForm.addEventListener("submit",async e=>{
 const myOrdersRoot=document.getElementById("my-orders-list");
 const customerAuthForm=document.getElementById("customer-auth-form");
 let customerAuthMode="signup";
+function applyCustomerGate(){
+  return db.auth.getUser().then(({data:{user}})=>{
+    document.body.classList.toggle("customer-locked",!user||user.is_anonymous);
+    return !!user&&!user.is_anonymous;
+  }).catch(()=>{document.body.classList.add("customer-locked");return false;});
+}
+db.auth.onAuthStateChange((event,session)=>{
+  document.body.classList.toggle("customer-locked",!session?.user||session.user.is_anonymous);
+});
 function customerAuthMessage(message,bad=false){
   const node=document.getElementById("customer-auth-message");
   if(node){node.textContent=message;node.style.color=bad?"#a33":"inherit";}
@@ -378,7 +387,7 @@ if(customerAuthForm){
   document.getElementById("customer-auth-switch").onclick=()=>setCustomerAuthMode(customerAuthMode==="signup"?"login":"signup");
   document.getElementById("customer-auth-logout").onclick=async()=>{
     const {error}=await db.auth.signOut();if(error){customerAuthMessage(error.message,true);return;}
-    customerAuthMessage("You have logged out.");await loadCustomerProfile();await loadMyOrders();
+    customerAuthMessage("You have logged out.");document.body.classList.add("customer-locked");await loadCustomerProfile();await loadMyOrders();
   };
   customerAuthForm.addEventListener("submit",async e=>{
     e.preventDefault();
