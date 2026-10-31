@@ -1,5 +1,5 @@
-const CACHE="hurmat-owner-shell-v5";
-const CORE=["./index.html","../admin.js?v=payments-owner-20261031-2","../icon.svg","./manifest.webmanifest"];
+const CACHE="hurmat-owner-shell-v6";
+const CORE=["./index.html","../admin.js?v=payments-owner-20261031-3","../icon.svg","./manifest.webmanifest"];
 self.addEventListener("install",event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(CORE)));self.skipWaiting()});
 self.addEventListener("activate",event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))));self.clients.claim()});
 self.addEventListener("fetch",event=>{
