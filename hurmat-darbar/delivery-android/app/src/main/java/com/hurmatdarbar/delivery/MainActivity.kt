@@ -7,6 +7,8 @@ import android.net.Uri
 import android.Manifest
 import android.content.pm.PackageManager
 import android.widget.*
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 import org.json.JSONObject
 import org.json.JSONArray
 import java.net.HttpURLConnection
@@ -19,13 +21,41 @@ class MainActivity : Activity() {
  private val apiKey="sb_publishable_n1PWbHcomKpd63FPDdWSEw_iSo6UTi0"
  private val worker=Executors.newSingleThreadExecutor()
  private var token:String?=null
+ private var refreshToken:String?=null
  private var online=false
  private var orderFilter="active"
  private var sharingOrderId:String?=null
  private lateinit var root:LinearLayout
  private lateinit var status:TextView
  private val ink=Color.rgb(33,31,24); private val gold=Color.rgb(181,138,75); private val paper=Color.rgb(245,241,232)
- override fun onCreate(savedInstanceState:Bundle?) { super.onCreate(savedInstanceState); login() }
+ override fun onCreate(savedInstanceState:Bundle?) { super.onCreate(savedInstanceState); restoreSessionOrLogin() }
+ private fun sessionPrefs()=EncryptedSharedPreferences.create(
+  this,"hurmat_rider_session",
+  MasterKey.Builder(this).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
+  EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+  EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+ )
+ private fun saveSession(access:String,refresh:String) {
+  token=access;refreshToken=refresh
+  sessionPrefs().edit().putString("refresh_token",refresh).apply()
+ }
+ private fun clearSession() {
+  token=null;refreshToken=null
+  try{sessionPrefs().edit().clear().apply()}catch(_:Exception){}
+ }
+ private fun restoreSessionOrLogin() {
+  val saved=try{sessionPrefs().getString("refresh_token",null)}catch(_:Exception){null}
+  if(saved.isNullOrBlank()){login();return}
+  setup("Restoring rider session")
+  worker.execute {
+   try{
+    val response=request(base+"/auth/v1/token?grant_type=refresh_token","POST",JSONObject().put("refresh_token",saved).toString(),null)
+    val access=response.optString("access_token");val refresh=response.optString("refresh_token",saved)
+    if(access.isBlank())throw Exception("Session refresh failed")
+    runOnUiThread{saveSession(access,refresh);orders()}
+   }catch(ex:Exception){runOnUiThread{clearSession();login();status.text="Please sign in again. "+message(ex)}}
+  }
+ }
  private fun setup(title:String) {
   root=LinearLayout(this).apply { orientation=1; setPadding(22,24,22,24); setBackgroundColor(paper) }
   root.addView(TextView(this).apply { text="H U R M A T   D A R B A R"; textSize=13f; setTextColor(gold) })
@@ -48,7 +78,7 @@ class MainActivity : Activity() {
    worker.execute { try {
     val s=request(base+"/auth/v1/token?grant_type=password","POST",JSONObject().put("email",e).put("password",p).toString(),null)
     val t=s.optString("access_token"); if(t.isBlank()) throw Exception("No access token returned")
-    token=t; runOnUiThread { orders() }
+    saveSession(t,s.optString("refresh_token")); runOnUiThread { orders() }
    } catch(ex:Exception){runOnUiThread{status.text=message(ex)}} }
   })
  }
@@ -123,6 +153,7 @@ class MainActivity : Activity() {
    val intent=Intent(this,RiderLocationService::class.java)
     .putExtra(RiderLocationService.EXTRA_ORDER_ID,orderId)
     .putExtra(RiderLocationService.EXTRA_ACCESS_TOKEN,accessToken)
+    .putExtra(RiderLocationService.EXTRA_REFRESH_TOKEN,refreshToken)
    if(android.os.Build.VERSION.SDK_INT>=26)startForegroundService(intent) else startService(intent)
    sharingOrderId=orderId
    status.text="Live location is sharing in the background for this delivery."
