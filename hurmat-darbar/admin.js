@@ -172,7 +172,9 @@ function reservationsView(){
   return reservations.map(r=>'<article class="card" style="margin:10px 0"><div class="row"><b>'+esc(r.name)+'</b><span class="tag s-new">'+esc(r.status)+'</span></div><p class="mute">'+esc(r.phone)+' · '+esc(r.party_size)+' guests</p><p class="mute">'+new Date(r.reserve_at).toLocaleString()+'</p><p class="mute">'+esc(r.notes||"")+'</p><div class="actions">'+["confirmed","rejected","cancelled"].filter(s=>r.status==="pending"||s==="cancelled").map(s=>'<button class="btn sm '+(s==="cancelled"?"ghost":"")+'" data-reservation="'+esc(r.id)+'" data-res-status="'+s+'">'+s+'</button>').join("")+'</div></article>').join("")||empty("No reservations have been received.");
 }
 function ridersView(){
-  return riders.map(r=>'<div class="item-row"><div class="item-meta"><b>'+esc(r.name||"Rider")+'</b><span class="mute">'+esc(r.phone||"No phone on file")+'</span></div><span class="tag '+(r.is_online?"s-ready":"s-served")+'">'+(r.is_online?"Online":"Offline")+'</span></div>').join("")||empty("No rider accounts are linked yet.");
+  const list=riders.map(r=>'<div class="item-row"><div class="item-meta"><b>'+esc(r.name||"Rider")+'</b><span class="mute">'+esc(r.phone||"No phone on file")+'</span></div><span class="tag '+(r.is_online?"s-ready":"s-served")+'">'+(r.is_online?"Online":"Offline")+'</span></div>').join("")||empty("No rider accounts are linked yet.");
+  const create=role==="owner"?'<section class="partner-panel" style="margin:12px 0"><div class="panel-heading"><div><h2>Create rider account</h2><p>Creates the secure sign-in, rider role and delivery profile together.</p></div></div><form id="rider-create-form" class="card"><label>Rider full name</label><input id="rider-name" required minlength="2" maxlength="80" placeholder="Full name"><label>Rider phone</label><input id="rider-phone" required type="tel" minlength="7" maxlength="20" placeholder="Phone number"><label>Rider email</label><input id="rider-email" required type="email" autocomplete="off" placeholder="rider@example.com"><label>Temporary password (at least 10 characters)</label><input id="rider-password" required type="password" minlength="10" autocomplete="new-password" placeholder="Create a temporary password"><button class="btn wide" id="rider-create-submit" type="submit">Create rider account</button><p class="mute" style="font-size:11px;line-height:1.6;margin-top:10px">Share the temporary password privately. The rider can sign in to the separate Hurmat Darbar Delivery app.</p></form></section>':"";
+  return create+'<section class="partner-panel"><div class="panel-heading"><div><h2>Registered riders</h2><p>Online availability updates from the delivery app.</p></div></div>'+list+'</section>';
 }
 function reportsView(){
   const now=new Date(),days=[];
@@ -480,6 +482,24 @@ function bindActions(){
       const messages={staff_accounts_not_configured:"Secure account creation is not configured on the server.",staff_email_already_registered:"This email already has a Supabase account.",invalid_staff_role:"Select a permitted staff role.",invalid_staff_email:"Enter a valid email address.",weak_staff_password:"Use a password with at least 10 characters."};
       toast(messages[err.message]||err.message||"Staff account could not be created.",true);
     }finally{button.disabled=false;button.textContent="Create staff account";}
+  };
+  const riderForm=document.getElementById("rider-create-form");
+  if(riderForm)riderForm.onsubmit=async e=>{
+    e.preventDefault();
+    const button=document.getElementById("rider-create-submit");
+    const name=document.getElementById("rider-name").value.trim();
+    const phone=document.getElementById("rider-phone").value.trim();
+    const email=document.getElementById("rider-email").value.trim().toLowerCase();
+    const password=document.getElementById("rider-password").value;
+    if(password.length<10){toast("Use a temporary password with at least 10 characters.",true);return;}
+    button.disabled=true;button.textContent="Creating secure rider account…";
+    try{
+      await api("",{action:"create_rider_account",name,phone,email,password});
+      riderForm.reset();await refresh();toast("Rider account and delivery profile created.");
+    }catch(err){
+      const messages={rider_accounts_not_configured:"Secure rider account creation is not configured on the server.",rider_email_already_registered:"This email already has a Supabase account.",invalid_rider_email:"Enter a valid rider email.",weak_rider_password:"Use a password with at least 10 characters.",invalid_rider_profile:"Enter a valid rider name and phone number."};
+      toast(messages[err.message]||err.message||"Rider account could not be created.",true);
+    }finally{button.disabled=false;button.textContent="Create rider account";}
   };
   const settingsForm=document.getElementById("settings-form");
   if(settingsForm)settingsForm.onsubmit=async e=>{
