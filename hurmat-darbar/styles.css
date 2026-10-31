@@ -1150,7 +1150,7 @@ body.customer-locked>#cart-scrim,
 body.customer-locked>#mobile-cart-bar,
 body.customer-locked>#order-success{display:none!important}
 body.customer-locked>main{display:block!important}
-body.customer-locked>main>*{display:none!important}
+body.customer-locked>main>section:not(#my-account){display:none!important}
 body.customer-locked #my-account{
   position:fixed!important;inset:0!important;z-index:9999!important;
   display:flex!important;flex-direction:column!important;justify-content:center!important;
