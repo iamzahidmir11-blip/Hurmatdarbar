@@ -496,6 +496,20 @@ function renderMyOrders(data,payments,refunds=[]){
       };
       form.append(ref,file,submit);card.append(form);
     }
+    if(["pending_confirmation","confirmed"].includes(o.status)){
+      const cancel=el("button","btn ghost sm","Cancel order");cancel.type="button";
+      cancel.onclick=async()=>{
+        if(!confirm("Cancel order #"+o.order_no+"? This is available only before preparation starts."))return;
+        cancel.disabled=true;cancel.textContent="Cancelling…";
+        try{
+          const {error}=await db.rpc("customer_cancel_order",{p_order:o.id,p_reason:"Cancelled by customer"});
+          if(error)throw error;
+          await loadMyOrders();
+          alert("Order cancelled. If payment was collected, a refund request has been sent to the restaurant.");
+        }catch(error){alert(error.message||"Could not cancel this order.");cancel.disabled=false;cancel.textContent="Cancel order";}
+      };
+      card.append(cancel);
+    }
     const track=el("button","btn ghost sm","Refresh live status");track.type="button";track.onclick=()=>loadMyOrders();card.append(track);
     myOrdersRoot.append(card);
   });
