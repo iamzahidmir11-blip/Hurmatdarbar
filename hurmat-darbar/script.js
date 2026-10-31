@@ -153,7 +153,7 @@ function updatePaymentInfo(){
   paymentInfo.replaceChildren();
   const method=paymentSelect.value;
   if(method==="upi_manual"&&restaurantSettings?.upi_id){
-    paymentInfo.append(el("span","","Pay using UPI to: "+restaurantSettings.upi_id+". The payment will remain pending until the restaurant verifies it."));
+    paymentInfo.append(el("span","","Pay using UPI to: "+restaurantSettings.upi_id+". Complete payment in your UPI app, then return here and tap Pay & Place Order. The payment remains pending until the restaurant verifies it."));
     const copy=el("button","btn ghost sm","Copy UPI ID");copy.type="button";
     copy.onclick=async()=>{try{await navigator.clipboard.writeText(restaurantSettings.upi_id);copy.textContent="Copied ✓"}catch{window.prompt("Copy UPI ID",restaurantSettings.upi_id)}};
     paymentInfo.append(copy);paymentInfo.hidden=false;
@@ -219,6 +219,9 @@ async function pollAvailabilityStatus(){
     if(statusValue==="rejected"){
       const reason=result.availability?.decision_reason||"Hurmat Darbar cannot deliver to this address right now.";
       clearAvailability("Not available: "+reason);return;
+    }
+    if(statusValue==="ordered"){
+      clearAvailability("This availability request has already been used to place an order. Check your tracking reference or contact the restaurant.");return;
     }
     if(statusValue==="expired"){
       clearAvailability("This availability request expired. Please check again.");return;
