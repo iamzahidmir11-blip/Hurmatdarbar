@@ -412,7 +412,7 @@ if(customerAuthForm){
         const {error}=await db.auth.signInWithPassword({email,password});if(error)throw error;
         customerAuthMessage("You are logged in.");
       }
-      await loadCustomerProfile();await loadMyOrders();
+      await applyCustomerGate();await loadCustomerProfile();await loadMyOrders();
     }catch(error){customerAuthMessage(error.message||"Account action failed.",true);}
     finally{button.disabled=false;button.textContent=customerAuthMode==="signup"?"Create account":"Log in";}
   });
