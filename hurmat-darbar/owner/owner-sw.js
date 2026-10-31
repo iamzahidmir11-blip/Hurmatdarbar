@@ -1,5 +1,5 @@
-const CACHE="hurmat-owner-shell-v1";
-const CORE=["./index.html","../admin.js","../icon.svg","./manifest.webmanifest"];
+const CACHE="hurmat-owner-shell-v2";
+const CORE=["./index.html","../admin.js?v=availability-approval-20261031-1","../icon.svg","./manifest.webmanifest"];
 self.addEventListener("install",event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(CORE)));self.skipWaiting()});
 self.addEventListener("activate",event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))));self.clients.claim()});
 self.addEventListener("fetch",event=>{
