@@ -401,6 +401,7 @@ if(customerAuthForm){
     const name=document.getElementById("account-name").value.trim();
     const phone=document.getElementById("account-phone").value.trim();
     if(customerAuthMode==="signup"&&name.length<2){customerAuthMessage("Enter your full name.",true);return;}
+    if(customerAuthMode==="signup"&&(password.length<10||!/[a-z]/.test(password)||!/[A-Z]/.test(password)||!/[0-9]/.test(password)||!/[^A-Za-z0-9]/.test(password))){customerAuthMessage("Use 10+ characters with uppercase, lowercase, a number and a symbol.",true);return;}
     if(password.length<8){customerAuthMessage("Password must be at least 8 characters.",true);return;}
     button.disabled=true;button.textContent=customerAuthMode==="signup"?"Creating account…":"Logging in…";
     try{
