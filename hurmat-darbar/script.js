@@ -173,17 +173,18 @@ function checkoutState(){
   const stockOk=cart.every(line=>{const item=items.find(i=>i.id===line.item_id);return item&&item.available!==false&&(item.track_stock!==true||Number(item.stock_qty||0)>=Number(line.qty))});
   const subtotal=cart.reduce((sum,line)=>sum+Number(line.price)*Number(line.qty),0);
   const enough=subtotal>=Number(restaurantSettings?.min_order||0);
-  const baseReady=cart.length>0&&stockOk&&!!restaurantSettings?.is_open&&methods.length>0&&enough;
+  const availabilityReady=cart.length>0&&stockOk&&!!restaurantSettings?.is_open&&enough;
+  const orderReady=availabilityReady&&methods.length>0;
   if(availabilityApproved){
     paymentLabel.hidden=false;paymentSelect.hidden=false;updatePaymentInfo();
     checkoutButton.textContent=paymentSelect.value==="upi_manual"?"Pay & Place Order":"Place Order";
-    checkoutButton.disabled=!baseReady||placingOrder||!paymentSelect.value;
+    checkoutButton.disabled=!orderReady||placingOrder||!paymentSelect.value;
     orderHelp.textContent=availabilityMessage||"Delivery approved. Choose payment and place your order.";
   }else{
     paymentLabel.hidden=true;paymentSelect.hidden=true;paymentInfo.hidden=true;
     checkoutButton.textContent=availabilityRequestId?(availabilityPolling?"Waiting for Owner…":"Check approval status"):"Check Availability";
-    checkoutButton.disabled=!baseReady||placingOrder||availabilityPolling;
-    orderHelp.textContent=availabilityRequestId?"Your request has been sent to Hurmat Darbar. Waiting for the Owner to confirm delivery.":!stockOk?"One or more products no longer have enough stock. Update your bag quantity.":!restaurantSettings?"Restaurant setup could not be loaded.":!restaurantSettings.is_open?"The restaurant is currently not accepting orders.":!methods.length?"Online ordering is paused until the restaurant enables a payment method.":!enough?"Minimum order is "+money(restaurantSettings.min_order)+". Add more items to continue.":availabilityMessage||"Check delivery availability first. Payment appears only after Owner approval.";
+    checkoutButton.disabled=!availabilityReady||placingOrder||availabilityPolling;
+    orderHelp.textContent=availabilityRequestId?"Your request has been sent to Hurmat Darbar. Waiting for the Owner to confirm delivery.":!cart.length?"Add at least one menu item before checking delivery availability.":!stockOk?"One or more products no longer have enough stock. Update your bag quantity.":!restaurantSettings?"Restaurant setup could not be loaded.":!restaurantSettings.is_open?"The restaurant is currently not accepting orders.":!enough?"Minimum order is "+money(restaurantSettings.min_order)+". Add more items to continue.":availabilityMessage||"Check delivery availability first. Payment is selected only after Owner approval.";
   }
 }
 async function submitAvailabilityRequest(){
@@ -286,7 +287,7 @@ checkoutButton.onclick=async()=>{
       checkoutButton.textContent="Checking availability…";
       await submitAvailabilityRequest();
     }
-  }catch(error){alert(error.message||"Unable to continue checkout.");}
+  }catch(error){availabilityMessage=error.message||"Unable to continue checkout.";if(orderHelp)orderHelp.textContent=availabilityMessage;alert(availabilityMessage);}
   finally{placingOrder=false;checkoutState();}
 };
 async function load(){
