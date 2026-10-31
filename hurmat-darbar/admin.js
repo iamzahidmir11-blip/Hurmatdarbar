@@ -510,17 +510,24 @@ async function startApp(){
   if(DEVELOPMENT_PREVIEW) return;
   if(availabilityRefreshTimer)clearInterval(availabilityRefreshTimer);
   availabilityRefreshTimer=setInterval(async()=>{
-    if(role!=="owner"||document.hidden)return;
+    if(document.hidden)return;
     try{
-      const result=await api("availability");
-      const next=result.requests||[];
-      const changed=JSON.stringify(next)!==JSON.stringify(availabilityRequests);
-      if(changed){availabilityRequests=next;render();}
-    }catch(error){console.warn("Availability request refresh failed:",error);}
+      let changed=false;
+      if(role==="owner"){
+        const result=await api("availability"),next=result.requests||[];
+        if(JSON.stringify(next)!==JSON.stringify(availabilityRequests)){availabilityRequests=next;changed=true;}
+      }
+      if(role==="owner"||role==="manager"){
+        const result=await api("payments"),next=result.payments||[];
+        if(JSON.stringify(next)!==JSON.stringify(payments)){payments=next;changed=true;}
+      }
+      if(changed)render();
+    }catch(error){console.warn("Live dashboard refresh failed:",error);}
   },8000);
   if(channel)await supabase.removeChannel(channel);
   channel=supabase.channel("hurmat-admin-live")
     .on("postgres_changes",{event:"*",schema:"public",table:"orders"},()=>refresh())
+    .on("postgres_changes",{event:"*",schema:"public",table:"payment_submissions"},()=>refresh())
     .on("postgres_changes",{event:"INSERT",schema:"public",table:"notifications"},()=>{refresh();toast("New restaurant notification.");})
     .on("postgres_changes",{event:"*",schema:"public",table:"menu_items"},()=>refresh())
     .on("postgres_changes",{event:"*",schema:"public",table:"menu_variants"},()=>refresh())
