@@ -17,7 +17,7 @@ const statusNames = {
 };
 const tabs = [["home","⌂","Overview"],["orders","▤","Orders"],["menu","▦","Menu"],["inventory","▣","Inventory"],["reservations","◷","Bookings"],["riders","♧","Riders"],["reports","▥","Reports"],["settings","⚙","Store setup"],["alerts","♢","Alerts"]];
 // Temporary development-only UI preview. Live data and all write operations remain protected.
-const DEVELOPMENT_PREVIEW = true;
+const DEVELOPMENT_PREVIEW = false;
 let user=null, role=null, page="home", orders=[], menuItems=[], menuCategories=[], reservations=[], riders=[], notifications=[], settings=null, channel=null, busy=false;
 
 function toast(message, bad=false){
@@ -67,7 +67,7 @@ function loginView(message){
   navRoot.innerHTML="";
   root.innerHTML='<div class="auth-card card"><div class="logo"><img src="../assets/hurmat-logo-repo.png" alt="Hurmat Darbar"></div><h1>Hurmat Owner</h1><p>Secure owner access to live orders, menu, inventory, bookings, delivery and restaurant settings. New owner accounts are created by invitation only.</p>'+
     (message?'<div class="notice">'+esc(message)+'</div>':'')+
-    '<form id="login-form"><label>Email address</label><input id="login-email" type="email" autocomplete="username" required placeholder="owner@example.com"><label>Password</label><input id="login-password" type="password" autocomplete="current-password" required placeholder="Your password"><button class="btn wide" id="login-submit" type="submit">Sign in to Hurmat Owner</button></form><button type="button" class="text-action" id="forgot-password" style="margin-top:14px">Forgot password?</button><p style="margin:14px 0 0">Owner accounts require a secure invitation and verified email. Owner accounts are issued through secure invitation only.</p></div>';
+    '<form id="login-form"><label>Email address</label><input id="login-email" type="email" autocomplete="username" required placeholder="owner@example.com"><label>Password</label><input id="login-password" type="password" autocomplete="current-password" required placeholder="Your password"><button class="btn wide" id="login-submit" type="submit">Sign in to Hurmat Owner</button></form><details style="margin-top:18px;text-align:left"><summary style="cursor:pointer;font-weight:700">First-time Owner activation</summary><p style="font-size:13px;line-height:1.6">Use the existing verified Hurmat Darbar account and the private one-time setup code supplied to the restaurant owner. Never share the code.</p><form id="owner-claim-form"><label>Existing account email</label><input id="claim-email" type="email" autocomplete="username" required placeholder="owner@example.com"><label>Account password</label><input id="claim-password" type="password" autocomplete="current-password" required placeholder="Your password"><label>Private setup code</label><input id="claim-code" type="password" autocomplete="off" minlength="10" maxlength="64" required placeholder="Enter setup code"><button class="btn wide" id="claim-submit" type="submit">Verify account & activate Owner</button></form></details><button type="button" class="text-action" id="forgot-password" style="margin-top:14px">Forgot password?</button><p style="margin:14px 0 0">Owner accounts require a verified account and role authorization.</p></div>';
   document.getElementById("login-form").addEventListener("submit",async e=>{
     e.preventDefault();const button=document.getElementById("login-submit");button.disabled=true;button.textContent="Checking account…";
     try{
@@ -76,6 +76,27 @@ function loginView(message){
       await verifyAccess();await startApp();
     }catch(err){await supabase.auth.signOut().catch(()=>{});loginView(err.message||"Sign-in failed.");}
   });
+  const claimForm=document.getElementById("owner-claim-form");
+  if(claimForm) claimForm.onsubmit=async e=>{
+    e.preventDefault();
+    const button=document.getElementById("claim-submit");
+    const email=document.getElementById("claim-email").value.trim();
+    const password=document.getElementById("claim-password").value;
+    const code=document.getElementById("claim-code").value.trim();
+    if(code.length<10){toast("Enter the private setup code.",true);return;}
+    button.disabled=true;button.textContent="Verifying secure owner claim…";
+    try{
+      const {error:loginError}=await supabase.auth.signInWithPassword({email,password});
+      if(loginError) throw loginError;
+      const {error:claimError}=await supabase.rpc("claim_owner",{p_code:code});
+      if(claimError) throw new Error(claimError.message==="owner_exists"?"An Owner account has already been activated. Sign in normally.":claimError.message==="invalid_code"?"The setup code is not valid.":"Owner activation could not be completed.");
+      await verifyAccess();
+      await startApp();
+    }catch(err){
+      await supabase.auth.signOut().catch(()=>{});
+      loginView(err.message||"Owner activation failed.");
+    }
+  };
   document.getElementById("forgot-password").onclick=async()=>{const email=document.getElementById("login-email").value.trim();if(!email){toast("Enter your owner email first.",true);return;}const {error}=await supabase.auth.resetPasswordForEmail(email);if(error){toast(error.message,true);return;}toast("Password reset email sent. Check your inbox.");};
 }
 function nav(){
