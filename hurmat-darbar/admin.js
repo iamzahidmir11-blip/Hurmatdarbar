@@ -209,7 +209,7 @@ function availabilityRequestsView(){
 }
 function paymentsView(){
   const pending=payments.filter(p=>p.status==="pending");
-  return '<section class="partner-panel"><div class="panel-heading"><div><h2>UPI payment verification</h2><p>Check the customer's UTR/reference and payment screenshot before confirming the order.</p></div><span class="pill">'+pending.length+' awaiting review</span></div>'+
+  return '<section class="partner-panel"><div class="panel-heading"><div><h2>UPI payment verification</h2><p>Check the customer UTR/reference and payment screenshot before confirming the order.</p></div><span class="pill">'+pending.length+' awaiting review</span></div>'+
     (payments.map(p=>'<article class="card" style="margin:12px 0"><div class="row"><b>Order #'+esc(p.orders?.order_no||"—")+'</b><span class="tag '+(p.status==="approved"?"s-served":p.status==="rejected"?"s-cancelled":"s-new")+'">'+esc(p.status)+'</span></div>'+
     '<p class="mute">'+esc(p.orders?.customer_name||"Customer")+' · '+esc(p.orders?.customer_phone||"")+'</p><p><b>Amount: '+money(p.orders?.total||0)+'</b></p><p class="mute">UPI reference: <b>'+esc(p.upi_reference)+'</b></p>'+
     (p.screenshot_url?'<a href="'+esc(p.screenshot_url)+'" target="_blank" rel="noopener" class="btn ghost sm">View payment screenshot ↗</a>':'<small>Screenshot link unavailable. Refresh to request a new secure link.</small>')+
