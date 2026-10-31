@@ -392,13 +392,10 @@ if(customerAuthForm){
     button.disabled=true;button.textContent=customerAuthMode==="signup"?"Creating account…":"Logging in…";
     try{
       if(customerAuthMode==="signup"){
+        await ensureGuestSession();
         const {data:{user:current}}=await db.auth.getUser();
-        let result;
-        if(current?.is_anonymous){
-          result=await db.auth.updateUser({email,password,data:{full_name:name,phone}});
-        }else{
-          result=await db.auth.signUp({email,password,options:{data:{full_name:name,phone}}});
-        }
+        if(current&&!current.is_anonymous)throw new Error("You are already logged in. Log out first before creating another account.");
+        const result=await db.auth.updateUser({email,password,data:{full_name:name,phone}});
         if(result.error)throw result.error;
         if(!result.data.session)throw new Error("Email confirmation is enabled in Supabase. Turn OFF Confirm email to allow password signup without OTP.");
         customerAuthMessage("Account created successfully. Your previous guest orders on this device are linked to this account.");
