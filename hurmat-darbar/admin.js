@@ -201,10 +201,11 @@ function availabilityRequestCard(r){
 }
 function availabilityRequestsView(){
   const pending=availabilityRequests.filter(r=>r.status==="pending");
-  const recent=availabilityRequests.filter(r=>r.status!=="pending").slice(0,5);
-  return '<section class="partner-panel"><div class="panel-heading"><div><h2>Delivery availability requests</h2><p>Review customer address and confirm delivery before payment.</p></div><span class="pill">'+pending.length+' pending</span></div>'+
+  const recent=availabilityRequests.filter(r=>r.status!=="pending").slice(0,8);
+  return '<section class="partner-panel"><div class="panel-heading"><div><h2>Delivery availability requests</h2><p>Review customer address and confirm delivery before payment.</p></div><div class="actions"><span class="pill">'+pending.length+' pending</span><button class="btn ghost sm" id="availability-refresh" type="button">Refresh requests</button></div></div>'+
+    (availabilityLoadError?'<div class="notice" role="alert">Could not load delivery requests: '+esc(availabilityLoadError)+'. Tap Refresh requests to retry.</div>':'')+
     (pending.map(availabilityRequestCard).join("")||empty("No delivery checks waiting for approval."))+
-    (recent.length?'<div class="mute" style="margin-top:16px">Recent decisions</div>'+recent.map(availabilityRequestCard).join(""):'')+
+    (recent.length?'<div class="mute" style="margin-top:16px">Recent requests</div>'+recent.map(availabilityRequestCard).join(""):'')+
     '</section>';
 }
 function paymentsView(){
@@ -268,13 +269,20 @@ async function refresh(){
   if(results[3].status==="fulfilled")riders=results[3].value.riders||[];
   if(results[4].status==="fulfilled"&&!results[4].value.error)notifications=results[4].value.data||[];
   if(results[5].status==="fulfilled"&&!results[5].value.error)settings=results[5].value.data;
-  if(results[6].status==="fulfilled")availabilityRequests=results[6].value.requests||[];
+  if(results[6].status==="fulfilled"){availabilityRequests=results[6].value.requests||[];availabilityLoadError="";}
+  else{availabilityLoadError=results[6].reason?.message||"Owner availability API is unavailable.";}
   if(results[7].status==="fulfilled")payments=results[7].value.payments||[];
   const categoryResult=await supabase.from("menu_categories").select("id,name,active,sort_order").order("sort_order");if(!categoryResult.error)menuCategories=categoryResult.data||[];
   render();
 }
 function bindActions(){
   document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{page=b.dataset.go;render();});
+  const availabilityRefresh=document.getElementById("availability-refresh");
+  if(availabilityRefresh)availabilityRefresh.onclick=async()=>{
+    availabilityRefresh.disabled=true;availabilityRefresh.textContent="Refreshing…";
+    try{await refresh();if(!availabilityLoadError)toast("Delivery requests refreshed.");}
+    catch(error){toast(error.message||"Could not refresh delivery requests.",true);}
+  };
   if(DEVELOPMENT_PREVIEW){
     document.querySelectorAll("button,input,select,textarea").forEach(el=>{
       if(el.matches("[data-tab],[data-go],#menu-search,#menu-filter,#order-search,#inventory-search")) return;
