@@ -282,7 +282,8 @@ async function refresh(){
   if(results[5].status==="fulfilled"&&!results[5].value.error)settings=results[5].value.data;
   if(results[6].status==="fulfilled"){availabilityRequests=results[6].value.requests||[];availabilityLoadError="";}
   else{availabilityLoadError=results[6].reason?.message||"Owner availability API is unavailable.";}
-  if(results[7].status==="fulfilled")payments=results[7].value.payments||[];\n  if(results[8].status==="fulfilled")refunds=results[8].value.refunds||[];
+  if(results[7].status==="fulfilled")payments=results[7].value.payments||[];
+  if(results[8].status==="fulfilled")refunds=results[8].value.refunds||[];
   const categoryResult=await supabase.from("menu_categories").select("id,name,active,sort_order").order("sort_order");if(!categoryResult.error)menuCategories=categoryResult.data||[];
   render();
 }
@@ -548,7 +549,9 @@ async function startApp(){
       }
       if(role==="owner"||role==="manager"){
         const result=await api("payments"),next=result.payments||[];
-        if(JSON.stringify(next)!==JSON.stringify(payments)){payments=next;changed=true;}\n        const refundResult=await api("refunds"),nextRefunds=refundResult.refunds||[];\n        if(JSON.stringify(nextRefunds)!==JSON.stringify(refunds)){refunds=nextRefunds;changed=true;}
+        if(JSON.stringify(next)!==JSON.stringify(payments)){payments=next;changed=true;}
+        const refundResult=await api("refunds"),nextRefunds=refundResult.refunds||[];
+        if(JSON.stringify(nextRefunds)!==JSON.stringify(refunds)){refunds=nextRefunds;changed=true;}
       }
       if(changed)render();
     }catch(error){console.warn("Live dashboard refresh failed:",error);}
@@ -556,7 +559,8 @@ async function startApp(){
   if(channel)await supabase.removeChannel(channel);
   channel=supabase.channel("hurmat-admin-live")
     .on("postgres_changes",{event:"*",schema:"public",table:"orders"},()=>refresh())
-    .on("postgres_changes",{event:"*",schema:"public",table:"payment_submissions"},()=>refresh())\n    .on("postgres_changes",{event:"*",schema:"public",table:"refund_requests"},()=>refresh())
+    .on("postgres_changes",{event:"*",schema:"public",table:"payment_submissions"},()=>refresh())
+    .on("postgres_changes",{event:"*",schema:"public",table:"refund_requests"},()=>refresh())
     .on("postgres_changes",{event:"INSERT",schema:"public",table:"notifications"},()=>{refresh();toast("New restaurant notification.");})
     .on("postgres_changes",{event:"*",schema:"public",table:"menu_items"},()=>refresh())
     .on("postgres_changes",{event:"*",schema:"public",table:"menu_variants"},()=>refresh())
