@@ -44,8 +44,8 @@ async function verifyAccess(){
   user=session.user;
   const {data,error}=await supabase.from("user_roles").select("role,active").eq("user_id",user.id).eq("active",true);
   if(error) throw error;
-  const match=(data||[]).find(x=>["owner","manager"].includes(x.role));
-  if(!match){await supabase.auth.signOut();user=null;role=null;throw new Error("This verified account does not have an active Owner or Manager role.");}
+  const match=(data||[]).find(x=>["owner","manager","kitchen","delivery_manager"].includes(x.role));
+  if(!match){await supabase.auth.signOut();user=null;role=null;throw new Error("This account is not active for the Owner dashboard. Ask the Owner to assign an access role in Supabase.");}
   role=match.role;
   return true;
 }
@@ -200,11 +200,12 @@ function settingsView(){
     '<label>UPI ID (required only if manual UPI is enabled)</label><input id="set-upi-id" value="'+esc(s.upi_id||"")+'">'+
     '<label style="display:flex;align-items:center;gap:8px;margin:14px 0"><input id="set-verified" type="checkbox" style="width:auto;margin:0" '+(s.location_verified?"checked":"")+'> I have checked and verified the restaurant map pin</label>'+
     '<button class="btn wide" type="submit">Save restaurant settings</button></form>'+
-    '<section class="partner-panel" style="margin-top:16px"><div class="panel-heading"><div><h2>Team access</h2><p>Create staff sign-in accounts. Owner access is managed directly in Supabase.</p></div></div>'+
+    (role==="owner"?    '<section class="partner-panel" style="margin-top:16px"><div class="panel-heading"><div><h2>Team access</h2><p>Create staff sign-in accounts. Owner access is managed directly in Supabase.</p></div></div>'+
     '<form id="staff-create-form" class="card"><label>Staff email</label><input id="staff-email" type="email" autocomplete="off" required placeholder="staff@example.com">'+
     '<label>Temporary password (at least 10 characters)</label><input id="staff-password" type="password" autocomplete="new-password" minlength="10" required placeholder="Create a temporary password">'+
     '<label>Access role</label><select id="staff-role"><option value="manager">Manager — orders, menu and bookings</option><option value="kitchen">Kitchen — order workflow</option><option value="delivery_manager">Delivery manager — riders and delivery</option></select>'+
     '<button class="btn wide" id="staff-create-submit" type="submit">Create staff account</button><p class="mute" style="font-size:11px;line-height:1.6;margin-top:10px">The account is created as email-confirmed in Supabase. Share the temporary password securely and ask the staff member to change it after first sign-in. Never reuse passwords.</p></form></section>'+
+:"")+
     '';
 }
 function render(){
