@@ -340,7 +340,7 @@ async function load(){
   renderCats(a.data||[]);
   status.textContent=items.length+" menu items loaded · live restaurant prices";
   const search=el("input","menu-search");search.placeholder="Search dishes, drinks and more…";search.oninput=()=>{query=search.value.toLowerCase().trim();render();};
-  const tools=el("div","menu-tools");tools.append(search);cats.after(tools);render();renderCart();checkoutState();resumeAvailability();loadMyOrders();if(window.hdOrdersTimer)clearInterval(window.hdOrdersTimer);window.hdOrdersTimer=setInterval(()=>{if(!document.hidden)loadMyOrders()},8000);
+  const tools=el("div","menu-tools");tools.append(search);cats.after(tools);render();renderCart();checkoutState();resumeAvailability();loadCustomerProfile();loadMyOrders();if(window.hdOrdersTimer)clearInterval(window.hdOrdersTimer);window.hdOrdersTimer=setInterval(()=>{if(!document.hidden)loadMyOrders()},8000);
 }
 renderCart();load();if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}))}
 const reservationForm=document.getElementById("reservation-form");
@@ -355,8 +355,96 @@ if(reservationForm)reservationForm.addEventListener("submit",async e=>{
 });
 
 const myOrdersRoot=document.getElementById("my-orders-list");
+const customerAuthForm=document.getElementById("customer-auth-form");
+let customerAuthMode="signup";
+function customerAuthMessage(message,bad=false){
+  const node=document.getElementById("customer-auth-message");
+  if(node){node.textContent=message;node.style.color=bad?"#a33":"inherit";}
+}
+function setCustomerAuthMode(mode){
+  customerAuthMode=mode;
+  const signup=mode==="signup";
+  document.getElementById("customer-auth-title").textContent=signup?"Create your account":"Welcome back";
+  document.getElementById("customer-auth-help").textContent=signup?"Use your Gmail address and create a password. No OTP is required when email confirmation is disabled.":"Log in with the email address and password you registered with.";
+  document.getElementById("account-name").required=signup;
+  document.getElementById("account-name").hidden=!signup;
+  document.getElementById("account-phone").hidden=!signup;
+  document.getElementById("account-password").autocomplete=signup?"new-password":"current-password";
+  document.getElementById("customer-auth-submit").textContent=signup?"Create account":"Log in";
+  document.getElementById("customer-auth-switch").textContent=signup?"Already have an account? Log in":"New here? Create an account";
+}
+if(customerAuthForm){
+  setCustomerAuthMode("signup");
+  document.getElementById("customer-auth-switch").onclick=()=>setCustomerAuthMode(customerAuthMode==="signup"?"login":"signup");
+  document.getElementById("customer-auth-logout").onclick=async()=>{
+    const {error}=await db.auth.signOut();if(error){customerAuthMessage(error.message,true);return;}
+    customerAuthMessage("You have logged out.");await loadCustomerProfile();await loadMyOrders();
+  };
+  customerAuthForm.addEventListener("submit",async e=>{
+    e.preventDefault();
+    const button=document.getElementById("customer-auth-submit");
+    const email=document.getElementById("account-email").value.trim().toLowerCase();
+    const password=document.getElementById("account-password").value;
+    const name=document.getElementById("account-name").value.trim();
+    const phone=document.getElementById("account-phone").value.trim();
+    if(customerAuthMode==="signup"&&name.length<2){customerAuthMessage("Enter your full name.",true);return;}
+    if(password.length<8){customerAuthMessage("Password must be at least 8 characters.",true);return;}
+    button.disabled=true;button.textContent=customerAuthMode==="signup"?"Creating account…":"Logging in…";
+    try{
+      if(customerAuthMode==="signup"){
+        const {data:{user:current}}=await db.auth.getUser();
+        let result;
+        if(current?.is_anonymous){
+          result=await db.auth.updateUser({email,password,data:{full_name:name,phone}});
+        }else{
+          result=await db.auth.signUp({email,password,options:{data:{full_name:name,phone}}});
+        }
+        if(result.error)throw result.error;
+        if(!result.data.session)throw new Error("Email confirmation is enabled in Supabase. Turn OFF Confirm email to allow password signup without OTP.");
+        customerAuthMessage("Account created successfully. Your previous guest orders on this device are linked to this account.");
+      }else{
+        const {error}=await db.auth.signInWithPassword({email,password});if(error)throw error;
+        customerAuthMessage("You are logged in.");
+      }
+      await loadCustomerProfile();await loadMyOrders();
+    }catch(error){customerAuthMessage(error.message||"Account action failed.",true);}
+    finally{button.disabled=false;button.textContent=customerAuthMode==="signup"?"Create account":"Log in";}
+  });
+}
+async function loadCustomerProfile(){
+  const {data:{user}}=await db.auth.getUser();
+  const summary=document.getElementById("customer-profile-summary");
+  const logout=document.getElementById("customer-auth-logout");
+  const save=document.getElementById("profile-save");
+  if(!user||user.is_anonymous){
+    if(summary)summary.textContent="Create an account or log in to manage your profile.";
+    if(logout)logout.hidden=true;if(save)save.disabled=true;return;
+  }
+  if(logout)logout.hidden=false;if(save)save.disabled=false;
+  const {data,error}=await db.from("customer_profiles").select("full_name,phone,email").eq("user_id",user.id).maybeSingle();
+  if(error){if(summary)summary.textContent="Profile could not be loaded: "+error.message;return;}
+  document.getElementById("profile-name").value=data?.full_name||user.user_metadata?.full_name||"";
+  document.getElementById("profile-phone").value=data?.phone||user.user_metadata?.phone||"";
+  summary.textContent=(data?.email||user.email||"")+" · Your account is active.";
+  const checkoutName=document.getElementById("customer-name"),checkoutPhone=document.getElementById("customer-phone");
+  if(checkoutName&&!checkoutName.value)checkoutName.value=data?.full_name||"";
+  if(checkoutPhone&&!checkoutPhone.value)checkoutPhone.value=data?.phone||"";
+}
+const profileSave=document.getElementById("profile-save");
+if(profileSave)profileSave.onclick=async()=>{
+  const {data:{user}}=await db.auth.getUser();if(!user||user.is_anonymous){customerAuthMessage("Please create an account or log in first.",true);return;}
+  const full_name=document.getElementById("profile-name").value.trim(),phone=document.getElementById("profile-phone").value.trim();
+  if(full_name.length<2){customerAuthMessage("Enter a valid display name.",true);return;}
+  profileSave.disabled=true;
+  const {error}=await db.from("customer_profiles").upsert({user_id:user.id,full_name,phone,email:user.email,updated_at:new Date().toISOString()});
+  profileSave.disabled=false;
+  if(error){customerAuthMessage(error.message,true);return;}
+  await db.auth.updateUser({data:{full_name,phone}});
+  document.getElementById("customer-profile-summary").textContent=user.email+" · Profile saved.";
+  const n=document.getElementById("customer-name"),p=document.getElementById("customer-phone");if(n)n.value=full_name;if(p)p.value=phone;
+};
 const orderStatusLabels={pending_confirmation:"Awaiting restaurant confirmation",confirmed:"Confirmed",preparing:"Being prepared",ready_for_pickup:"Ready for pickup",picked_up:"Picked up",out_for_delivery:"Out for delivery",delivered:"Delivered",cancelled:"Cancelled",rejected:"Rejected",delivery_failed:"Delivery issue"};
-function renderMyOrders(data,payments){
+function renderMyOrders(data,payments,refunds=[]){
   if(!myOrdersRoot)return;myOrdersRoot.replaceChildren();
   if(!data.length){myOrdersRoot.append(el("p","my-orders-empty","Your placed orders will appear here."));return;}
   data.forEach(o=>{
@@ -366,6 +454,14 @@ function renderMyOrders(data,payments){
     card.append(el("p","my-order-meta","Payment: "+o.payment_method+" · "+(o.payment_status==="paid"?"Paid":o.payment_status==="cod_pending"?"Cash on delivery":"Payment pending")));
     const proofs=payments.filter(p=>p.order_id===o.id);
     if(proofs.length)card.append(el("p","my-order-meta","UPI proof: "+proofs[0].status+(proofs[0].review_note?" · "+proofs[0].review_note:"")));
+    const refund=refunds.find(r=>r.order_id===o.id);
+    if(refund){
+      card.append(el("p","my-order-meta","Refund: "+refund.status.replaceAll("_"," ")+" · "+money(refund.amount)));
+      if(refund.refund_reference)card.append(el("p","my-order-meta","Refund reference: "+refund.refund_reference));
+      if(refund.owner_note)card.append(el("p","my-order-meta","Refund update: "+refund.owner_note));
+    }else if(["cancelled","rejected","delivery_failed"].includes(o.status)&&o.payment_status==="paid"){
+      card.append(el("p","my-order-meta","Refund record is being prepared. Please refresh shortly."));
+    }
     if(o.live?.history?.length){const timeline=el("div","my-order-timeline");o.live.history.slice(-5).forEach(h=>timeline.append(el("small","",String(h.status).replaceAll("_"," ")+" · "+new Date(h.at).toLocaleString())));card.append(timeline);}
     if(o.live?.rider){card.append(el("p","my-order-meta","Rider: "+o.live.rider.name+(o.live.rider.phone?" · "+o.live.rider.phone:"")));}
     if(o.live?.rider_location?.lat&&o.live?.rider_location?.lng){const a=el("a","my-order-map","View rider location ↗");a.href="https://www.google.com/maps?q="+o.live.rider_location.lat+","+o.live.rider_location.lng;a.target="_blank";a.rel="noopener";card.append(a);}
@@ -398,12 +494,14 @@ async function loadMyOrders(){
   if(!myOrdersRoot)return;
   try{
     const data=await callRestaurantApi("GET","view=my_orders");
+    const {data:{user}}=await db.auth.getUser();
+    const {data:refundRows}=user?await db.from("refund_requests").select("id,order_id,amount,reason,status,refund_reference,owner_note,requested_at,processed_at").eq("customer_id",user.id).order("requested_at",{ascending:false}).limit(30):{data:[]};
     const enriched=await Promise.all((data.orders||[]).slice(0,12).map(async o=>{
       if(["delivered","cancelled","rejected","delivery_failed"].includes(o.status))return o;
       const {data:live}=await db.rpc("track_order",{p_token:o.tracking_token});
       return {...o,live:live||null};
     }));
-    renderMyOrders(enriched,data.payments||[]);
+    renderMyOrders(enriched,data.payments||[],refundRows||[]);
   }
   catch(e){myOrdersRoot.textContent="Your order history will appear here after you place an order on this device.";}
 }
