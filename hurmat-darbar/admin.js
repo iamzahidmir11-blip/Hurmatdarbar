@@ -42,7 +42,6 @@ async function verifyAccess(){
   const {data:{session}}=await supabase.auth.getSession();
   if(!session){user=null;role=null;return false;}
   user=session.user;
-  if(!user.email_confirmed_at){await supabase.auth.signOut();user=null;role=null;throw new Error("Verify your email address before signing in.");}
   const {data,error}=await supabase.from("user_roles").select("role,active").eq("user_id",user.id).eq("active",true);
   if(error) throw error;
   const match=(data||[]).find(x=>["owner","manager"].includes(x.role));
@@ -65,39 +64,24 @@ function passwordSetupView(){
 }
 function loginView(message){
   navRoot.innerHTML="";
-  root.innerHTML='<div class="auth-card card"><div class="logo"><img src="../assets/hurmat-logo-repo.png" alt="Hurmat Darbar"></div><h1>Hurmat Owner</h1><p>Secure owner access to live orders, menu, inventory, bookings, delivery and restaurant settings. New owner accounts are created by invitation only.</p>'+
+  root.innerHTML='<div class="auth-card card"><div class="logo"><img src="../assets/hurmat-logo-repo.png" alt="Hurmat Darbar"></div><span class="auth-kicker">PRIVATE STAFF ACCESS</span><h1>Hurmat Owner</h1><p>Sign in with the email and password created and activated by the account administrator in Supabase.</p>'+
     (message?'<div class="notice">'+esc(message)+'</div>':'')+
-    '<form id="login-form"><label>Email address</label><input id="login-email" type="email" autocomplete="username" required placeholder="owner@example.com"><label>Password</label><input id="login-password" type="password" autocomplete="current-password" required placeholder="Your password"><button class="btn wide" id="login-submit" type="submit">Sign in to Hurmat Owner</button></form><details style="margin-top:18px;text-align:left"><summary style="cursor:pointer;font-weight:700">First-time Owner activation</summary><p style="font-size:13px;line-height:1.6">Use the existing verified Hurmat Darbar account and the private one-time setup code supplied to the restaurant owner. Never share the code.</p><form id="owner-claim-form"><label>Existing account email</label><input id="claim-email" type="email" autocomplete="username" required placeholder="owner@example.com"><label>Account password</label><input id="claim-password" type="password" autocomplete="current-password" required placeholder="Your password"><label>Private setup code</label><input id="claim-code" type="password" autocomplete="off" minlength="10" maxlength="64" required placeholder="Enter setup code"><button class="btn wide" id="claim-submit" type="submit">Verify account & activate Owner</button></form></details><button type="button" class="text-action" id="forgot-password" style="margin-top:14px">Forgot password?</button><p style="margin:14px 0 0">Owner accounts require a verified account and role authorization.</p></div>';
+    '<form id="login-form"><label>Email address</label><input id="login-email" type="email" autocomplete="username" required placeholder="Enter your registered email"><label>Password</label><input id="login-password" type="password" autocomplete="current-password" required placeholder="Enter your password"><button class="btn wide" id="login-submit" type="submit">Sign in</button></form><p class="auth-footnote">Accounts are created and activated by the system administrator. Contact them if you cannot sign in.</p></div>';
   document.getElementById("login-form").addEventListener("submit",async e=>{
-    e.preventDefault();const button=document.getElementById("login-submit");button.disabled=true;button.textContent="Checking account…";
+    e.preventDefault();
+    const button=document.getElementById("login-submit");
+    const email=document.getElementById("login-email").value.trim().toLowerCase();
+    const password=document.getElementById("login-password").value;
+    button.disabled=true;button.textContent="Signing in…";
     try{
-      const {error}=await supabase.auth.signInWithPassword({email:document.getElementById("login-email").value.trim(),password:document.getElementById("login-password").value});
+      const {error}=await supabase.auth.signInWithPassword({email,password});
       if(error) throw error;
       await verifyAccess();await startApp();
-    }catch(err){await supabase.auth.signOut().catch(()=>{});loginView(err.message||"Sign-in failed.");}
-  });
-  const claimForm=document.getElementById("owner-claim-form");
-  if(claimForm) claimForm.onsubmit=async e=>{
-    e.preventDefault();
-    const button=document.getElementById("claim-submit");
-    const email=document.getElementById("claim-email").value.trim();
-    const password=document.getElementById("claim-password").value;
-    const code=document.getElementById("claim-code").value.trim();
-    if(code.length<10){toast("Enter the private setup code.",true);return;}
-    button.disabled=true;button.textContent="Verifying secure owner claim…";
-    try{
-      const {error:loginError}=await supabase.auth.signInWithPassword({email,password});
-      if(loginError) throw loginError;
-      const {error:claimError}=await supabase.rpc("claim_owner",{p_code:code});
-      if(claimError) throw new Error(claimError.message==="owner_exists"?"An Owner account has already been activated. Sign in normally.":claimError.message==="invalid_code"?"The setup code is not valid.":"Owner activation could not be completed.");
-      await verifyAccess();
-      await startApp();
     }catch(err){
       await supabase.auth.signOut().catch(()=>{});
-      loginView(err.message||"Owner activation failed.");
+      loginView(err.message||"Sign-in failed. Check your email and password.");
     }
-  };
-  document.getElementById("forgot-password").onclick=async()=>{const email=document.getElementById("login-email").value.trim();if(!email){toast("Enter your owner email first.",true);return;}const {error}=await supabase.auth.resetPasswordForEmail(email);if(error){toast(error.message,true);return;}toast("Password reset email sent. Check your inbox.");};
+  });
 }
 function nav(){
   const mainTabs=tabs.slice(0,4);
@@ -216,6 +200,11 @@ function settingsView(){
     '<label>UPI ID (required only if manual UPI is enabled)</label><input id="set-upi-id" value="'+esc(s.upi_id||"")+'">'+
     '<label style="display:flex;align-items:center;gap:8px;margin:14px 0"><input id="set-verified" type="checkbox" style="width:auto;margin:0" '+(s.location_verified?"checked":"")+'> I have checked and verified the restaurant map pin</label>'+
     '<button class="btn wide" type="submit">Save restaurant settings</button></form>'+
+    '<section class="partner-panel" style="margin-top:16px"><div class="panel-heading"><div><h2>Team access</h2><p>Create staff sign-in accounts. Owner access is managed directly in Supabase.</p></div></div>'+
+    '<form id="staff-create-form" class="card"><label>Staff email</label><input id="staff-email" type="email" autocomplete="off" required placeholder="staff@example.com">'+
+    '<label>Temporary password (at least 10 characters)</label><input id="staff-password" type="password" autocomplete="new-password" minlength="10" required placeholder="Create a temporary password">'+
+    '<label>Access role</label><select id="staff-role"><option value="manager">Manager — orders, menu and bookings</option><option value="kitchen">Kitchen — order workflow</option><option value="delivery_manager">Delivery manager — riders and delivery</option></select>'+
+    '<button class="btn wide" id="staff-create-submit" type="submit">Create staff account</button><p class="mute" style="font-size:11px;line-height:1.6;margin-top:10px">The account is created as email-confirmed in Supabase. Share the temporary password securely and ask the staff member to change it after first sign-in. Never reuse passwords.</p></form></section>'+
     '';
 }
 function render(){
@@ -383,6 +372,24 @@ function bindActions(){
   });
   const ownerInviteForm=document.getElementById("owner-invite-form");
   if(ownerInviteForm)ownerInviteForm.onsubmit=async e=>{e.preventDefault();const button=document.getElementById("owner-invite-submit"),email=document.getElementById("owner-invite-email").value.trim().toLowerCase();if(!email)return;button.disabled=true;button.textContent="Sending invitation…";try{await api("",{action:"invite_owner",email});ownerInviteForm.reset();toast("Owner invitation sent. Ask them to check their email.");}catch(err){toast(err.message==="owner_email_already_registered"?"This email already has an account. Use the existing account or another email.":err.message==="owner_invites_not_configured"?"Owner invitations need server mail configuration.":err.message||"Owner invitation failed.",true);}finally{button.disabled=false;button.textContent="Send secure owner invitation";}};
+  const staffForm=document.getElementById("staff-create-form");
+  if(staffForm)staffForm.onsubmit=async e=>{
+    e.preventDefault();
+    const button=document.getElementById("staff-create-submit");
+    const email=document.getElementById("staff-email").value.trim().toLowerCase();
+    const password=document.getElementById("staff-password").value;
+    const staffRole=document.getElementById("staff-role").value;
+    if(password.length<10){toast("Temporary password must be at least 10 characters.",true);return;}
+    button.disabled=true;button.textContent="Creating secure account…";
+    try{
+      await api("",{action:"create_staff_account",email,password,role:staffRole});
+      staffForm.reset();
+      toast("Staff account created and activated in Supabase. Share the login details securely.");
+    }catch(err){
+      const messages={staff_accounts_not_configured:"Secure account creation is not configured on the server.",staff_email_already_registered:"This email already has a Supabase account.",invalid_staff_role:"Select a permitted staff role.",invalid_staff_email:"Enter a valid email address.",weak_staff_password:"Use a password with at least 10 characters."};
+      toast(messages[err.message]||err.message||"Staff account could not be created.",true);
+    }finally{button.disabled=false;button.textContent="Create staff account";}
+  };
   const settingsForm=document.getElementById("settings-form");
   if(settingsForm)settingsForm.onsubmit=async e=>{
     e.preventDefault();
@@ -452,7 +459,7 @@ async function startApp(){
 }
 async function init(){
   if(DEVELOPMENT_PREVIEW){await startApp();return;}
-  try{const {data:{session}}=await supabase.auth.getSession();if(session?.user?.user_metadata?.owner_password_setup_required){passwordSetupView();return;}if(await verifyAccess())await startApp();else loginView("");}
+  try{const {data:{session}}=await supabase.auth.getSession();if(await verifyAccess())await startApp();else loginView("");}
   catch(e){loginView(e.message||"Unable to verify account.");}
 }
 if(!DEVELOPMENT_PREVIEW)supabase.auth.onAuthStateChange((event,session)=>{
