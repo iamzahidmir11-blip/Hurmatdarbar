@@ -146,7 +146,7 @@ function availabilityDetailsMatch(){
   return document.getElementById("customer-name").value.trim()===availabilityPayload.name
     &&document.getElementById("customer-phone").value.trim()===availabilityPayload.phone
     &&document.getElementById("customer-address").value.trim()===availabilityPayload.address
-    &&document.getElementById("customer-notes").value.trim()===availabilityPayload.notes
+    &&document.getElementById("customer-notes").value.trim().slice(0,300)===availabilityPayload.notes
     &&same(currentCartItems(),(availabilityPayload.items||[]).slice().sort((a,b)=>a.variant_id.localeCompare(b.variant_id)));
 }
 function updatePaymentInfo(){
@@ -190,8 +190,8 @@ async function submitAvailabilityRequest(){
   const name=document.getElementById("customer-name").value.trim();
   const phone=document.getElementById("customer-phone").value.trim();
   const address=document.getElementById("customer-address").value.trim();
-  const notes=document.getElementById("customer-notes").value.trim();
-  if(name.length<2||address.length<8||phone.replace(/\\D/g,"").length<10)throw new Error("Enter your name, valid mobile number and complete delivery address.");
+  const notes=document.getElementById("customer-notes").value.trim().slice(0,300);
+  if(name.length<2||address.length<8||phone.replace(/\D/g,"").length<10)throw new Error("Enter your name, valid mobile number and complete delivery address.");
   const position=await getPosition();
   const request={name,phone,address,lat:position.lat,lng:position.lng,notes,items:currentCartItems()};
   const result=await callRestaurantApi("POST","",{action:"request_delivery_availability",request});
