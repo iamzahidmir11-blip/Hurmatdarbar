@@ -116,7 +116,7 @@ class RiderLocationService : Service() {
  private fun stopSharing() {
   try { if(listener!=null) manager?.removeUpdates(listener!!) } catch(_:Exception) {}
   listener=null;manager=null
-  if(Build.VERSION.SDK_INT>=24) stopForeground(STOP_FOREGROUND_REMOVE) else @Suppress("DEPRECATION") stopForeground(true)
+  stopForeground(STOP_FOREGROUND_REMOVE)
   stopSelf()
  }
 
