@@ -124,7 +124,8 @@ function orderCard(o){
     '<div class="row"><span class="mute">'+new Date(o.created_at).toLocaleString()+'</span><b class="price">'+money(o.total)+'</b></div>'+
     '<p class="mute" style="margin-top:7px">Payment: '+esc(o.payment_method)+' · '+esc(o.payment_status)+'</p>'+
     (canAdvance?'<div class="actions"><button class="btn sm" data-order="'+esc(o.id)+'" data-status="'+next+'">Mark '+esc(statusNames[next])+'</button><button class="btn sm ghost" data-cancel="'+esc(o.id)+'">Cancel / reject</button></div>':'')+
-    (next==="confirmed"&&o.payment_method==="upi_manual"&&o.payment_status!=="paid"?'<p class="mute">Awaiting UPI payment verification. Review it in Payments before confirming this order.</p>':"")+\n    (o.status==="ready_for_pickup"&&riderOptions?'<div class="actions"><select id="rider-'+esc(o.id)+'"><option value="">Choose rider</option>'+riderOptions+'</select><button class="btn sm ghost" data-assign="'+esc(o.id)+'">Assign rider</button></div>':'')+
+    (next==="confirmed"&&o.payment_method==="upi_manual"&&o.payment_status!=="paid"?'<p class="mute">Awaiting UPI payment verification. Review it in Payments before confirming this order.</p>':"")+
+    (o.status==="ready_for_pickup"&&riderOptions?'<div class="actions"><select id="rider-'+esc(o.id)+'"><option value="">Choose rider</option>'+riderOptions+'</select><button class="btn sm ghost" data-assign="'+esc(o.id)+'">Assign rider</button></div>':'')+
     '</article>';
 }
 function homeView(){
