@@ -12,7 +12,7 @@
 <body>
 <header class="top">
   <a class="logo" href="#home" aria-label="Hurmat Darbar home"><img class="brand-logo" src="assets/hurmat-logo-repo.png" alt="Hurmat Darbar logo" width="48" height="48"><span>HURMAT <b>DARBAR</b><small>URI · JAMMU & KASHMIR</small></span></a>
-  <nav aria-label="Main navigation"><a href="#menu">Order food</a><a href="#services">Reservations</a><a href="#visit">Find us</a></nav>
+  <nav aria-label="Main navigation"><a href="#menu">Order food</a><a href="#services">Reservations</a><a href="#my-orders">My Orders</a><a href="#visit">Find us</a></nav>
   <button class="cart-trigger" id="open-cart" type="button">Your bag <b id="cart-count">0</b></button>
   <a class="top-cta" href="tel:+919797151590">Call restaurant ↗</a>
   <button class="hamb" type="button" aria-label="Toggle navigation">☰</button>
@@ -32,6 +32,10 @@
       <form class="service-card" id="reservation-form"><div class="service-kicker">01 · TABLE BOOKINGS</div><h3>Book a table</h3><p>Send a reservation request. Our restaurant team will confirm it with you.</p><label for="res-name">Your name</label><input id="res-name" required minlength="2" maxlength="80" placeholder="Full name"><label for="res-phone">Mobile number</label><input id="res-phone" required type="tel" inputmode="tel" placeholder="10-digit mobile number"><div class="service-two"><div><label for="res-party">Guests</label><input id="res-party" type="number" min="1" max="30" value="2" required></div><div><label for="res-time">Date and time</label><input id="res-time" type="datetime-local" required></div></div><label for="res-notes">Notes (optional)</label><textarea id="res-notes" maxlength="300" placeholder="Any special request"></textarea><button class="btn primary" type="submit">Request a table ↗</button><small id="res-message">Your request is sent to the restaurant for confirmation.</small></form>
       <form class="service-card" id="tracking-form"><div class="service-kicker">02 · ORDER UPDATES</div><h3>Track your order</h3><p>Already placed an order? Use the tracking reference from your confirmation.</p><label for="tracking-token">Tracking reference</label><input id="tracking-token" required minlength="16" maxlength="80" placeholder="Paste your tracking reference"><button class="btn primary" type="submit">Find my order ↗</button><div id="tracking-result" class="tracking-result" aria-live="polite"></div><small>Keep your tracking reference private. Anyone with it can view the order status.</small></form>
     </div>
+  </section>
+  <section class="customer-tools my-orders-section" id="my-orders">
+    <div class="section-head"><div><p class="eyebrow">YOUR HURMAT DARBAR ACCOUNT</p><h2>My <span>Orders.</span></h2><p class="menu-intro">Your order status and payment verification update automatically.</p></div></div>
+    <div id="my-orders-list" class="my-orders-list" aria-live="polite"><p class="my-orders-empty">Loading your orders…</p></div>
   </section>
   <section class="visit" id="visit"><div><p class="eyebrow">COME BY AND SAY HELLO</p><h2>Meet us<br><span>in Uri.</span></h2><p>For questions about your order, delivery coverage or reservations, contact the restaurant team.</p><a class="btn light" href="https://www.google.com/maps/search/?api=1&query=Hurmat+Darbar+Uri+Jammu+Kashmir" target="_blank" rel="noopener">Get directions ↗</a></div><div class="details"><div><small>ADDRESS</small><p>Opposite Tehsil,<br>Uri, Baramulla, J&K – 193123</p></div><div><small>PHONE</small><p><a href="tel:+919797151590">+91 97971 51590</a></p></div><div><small>EMAIL</small><p><a href="mailto:darbarhurmat@gmail.com">darbarhurmat@gmail.com</a></p></div><div><small>HOURS</small><p>Every day<br>9:00 AM – 11:00 PM</p></div></div></section>
 </main>
@@ -58,5 +62,5 @@
   <div class="success-card"><div class="success-mark">✓</div><p class="eyebrow">ORDER RECEIVED</p><h2 id="success-title">You're all set.</h2><p id="success-copy">Your order has been sent to Hurmat Darbar.</p><div class="success-reference"><small>YOUR TRACKING REFERENCE</small><code id="success-token"></code><button id="copy-tracking" type="button">Copy reference</button></div><button id="success-close" class="checkout-btn" type="button">Continue browsing</button></div>
 </div>
 <footer><a class="logo" href="#home"><img class="brand-logo" src="assets/hurmat-logo-repo.png" alt="Hurmat Darbar logo" width="48" height="48"><span>HURMAT <b>DARBAR</b><small>URI · JAMMU & KASHMIR</small></span></a><p>Good food. Warm hospitality. Memorable moments.</p><span>© <span id="year"></span> Hurmat Darbar · <a href="owner/index.html" aria-label="Hurmat Owner login">Owner login</a></span></footer>
-<script type="module" src="script.js?v=availability-20261031-3"></script>
+<script type="module" src="script.js?v=payments-orders-20261031-1"></script>
 </body></html>
