@@ -1139,3 +1139,36 @@ footer .logo .brand-logo{
 .my-order-proof-form input{padding:11px;border:1px solid var(--line);background:#fff;border-radius:6px;font:12px Manrope}
 .my-orders-empty{font-size:13px;color:var(--muted);padding:16px 0}
 @media(max-width:760px){.my-orders-section{padding:60px 7vw}.my-order-card{padding:15px}.my-order-head{align-items:flex-start;flex-direction:column}.payment-proof-fields{padding:11px}}
+
+
+/* Customer login-first access gate */
+body.customer-locked{overflow:hidden!important}
+body.customer-locked>header,
+body.customer-locked>footer,
+body.customer-locked>#cart-panel,
+body.customer-locked>#cart-scrim,
+body.customer-locked>#mobile-cart-bar,
+body.customer-locked>#order-success{display:none!important}
+body.customer-locked>main{display:block!important}
+body.customer-locked>main>section:not(#my-account){display:none!important}
+body.customer-locked #my-account{
+  position:fixed!important;inset:0!important;z-index:9999!important;
+  display:flex!important;flex-direction:column!important;justify-content:center!important;
+  overflow-y:auto!important;margin:0!important;padding:28px 18px!important;
+  background:#f7f6f2!important;color:#171717!important;
+}
+body.customer-locked #my-account .section-head{width:min(100%,440px);margin:0 auto 18px!important}
+body.customer-locked #my-account .section-head h2{font-size:clamp(34px,8vw,48px)!important}
+body.customer-locked #my-account .section-head .menu-intro{max-width:390px}
+body.customer-locked #my-account .service-grid{display:block!important;width:min(100%,440px);margin:0 auto}
+body.customer-locked #my-account #customer-profile-card{display:none!important}
+body.customer-locked #my-account #customer-auth-form{
+  width:100%!important;max-width:440px!important;margin:0 auto!important;
+  padding:25px!important;background:#fff!important;border:1px solid #e7e4dc!important;
+  border-radius:12px!important;box-shadow:0 18px 60px #1717170d!important;
+}
+body.customer-locked #my-account #customer-auth-form h3{font-size:24px!important}
+body.customer-locked #my-account #customer-auth-form input{min-height:46px!important}
+body.customer-locked #my-account #customer-auth-form .btn{width:100%!important}
+body.customer-locked #my-account #customer-auth-form .btn.ghost{background:#f4f3ef!important}
+body.customer-locked #my-account #customer-auth-form .service-kicker{letter-spacing:1.5px}
