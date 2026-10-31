@@ -18,7 +18,7 @@ const statusNames = {
 const tabs = [["home","⌂","Overview"],["orders","▤","Orders"],["menu","▦","Menu"],["inventory","▣","Inventory"],["reservations","◷","Bookings"],["riders","♧","Riders"],["reports","▥","Reports"],["settings","⚙","Store setup"],["alerts","♢","Alerts"]];
 // Temporary development-only UI preview. Live data and all write operations remain protected.
 const DEVELOPMENT_PREVIEW = false;
-let user=null, role=null, page="home", orders=[], menuItems=[], menuCategories=[], reservations=[], riders=[], notifications=[], settings=null, channel=null, busy=false;
+let user=null, role=null, page="home", orders=[], menuItems=[], menuCategories=[], reservations=[], riders=[], notifications=[], availabilityRequests=[], settings=null, channel=null, busy=false;
 
 function toast(message, bad=false){
   let el=document.getElementById("admin-toast");
@@ -136,7 +136,7 @@ function homeView(){
   const low=menuItems.filter(i=>i.track_stock&&Number(i.stock_qty||0)<=5).length;
   const stages=[["New","pending_confirmation"],["Confirmed","confirmed"],["Preparing","preparing"],["Ready","ready_for_pickup"],["On delivery","out_for_delivery"]];
   const pipeline=stages.map(([label,status])=>'<div class="pipeline-step"><b>'+orders.filter(o=>o.status===status).length+'</b><span>'+label+'</span></div>').join("");
-  return '<section class="welcome-strip"><div><span class="eyebrow">TODAY AT HURMAT DARBAR</span><h2>Restaurant overview</h2><p>Orders, kitchen activity and sales — all in one place.</p></div><div class="welcome-date">'+now.toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short",year:"numeric"})+'</div></section>'+
+  return availabilityRequestsView()+'<section class="welcome-strip"><div><span class="eyebrow">TODAY AT HURMAT DARBAR</span><h2>Restaurant overview</h2><p>Orders, kitchen activity and sales — all in one place.</p></div><div class="welcome-date">'+now.toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short",year:"numeric"})+'</div></section>'+
   '<div class="partner-metrics"><article class="metric-card"><span>ORDERS TODAY</span><b>'+todays.length+'</b><small>'+pending+' awaiting confirmation</small></article><article class="metric-card"><span>SALES TODAY</span><b>'+money(revenue)+'</b><small>Delivered orders only</small></article><article class="metric-card"><span>ACTIVE ORDERS</span><b>'+active+'</b><small>Across kitchen and delivery</small></article><article class="metric-card"><span>STOCK ALERTS</span><b>'+low+'</b><small>Low or out-of-stock items</small></article></div>'+
   '<div class="dashboard-columns"><section class="partner-panel"><div class="panel-heading"><div><h2>Order workflow</h2><p>Live status across the restaurant</p></div><button class="text-action" data-go="orders">Open orders →</button></div><div class="order-pipeline">'+pipeline+'</div></section>'+
   '<section class="partner-panel"><div class="panel-heading"><div><h2>Quick operations</h2><p>Common restaurant controls</p></div></div><div class="quick-links"><button data-go="menu"><span>▦</span><b>Manage menu</b><small>Items, photos & prices</small></button><button data-go="inventory"><span>▣</span><b>Inventory</b><small>Stock counts & alerts</small></button><button data-go="settings"><span>⚙</span><b>Store setup</b><small>Hours, location & payments</small></button><button data-go="reports"><span>▥</span><b>Business reports</b><small>Sales & popular dishes</small></button></div></section></div>'+
@@ -145,7 +145,7 @@ function homeView(){
 }
 function ordersView(){
   const groups=[["New orders","pending_confirmation"],["Confirmed","confirmed"],["Preparing","preparing"],["Ready for pickup","ready_for_pickup"],["Delivery / completed",["picked_up","out_for_delivery","delivered"]],["Cancelled / rejected",["cancelled","rejected","delivery_failed"]]];
-  return '<div class="orders-toolbar"><div><b>'+orders.length+' total orders</b><span> · Latest orders appear first</span></div><input id="order-search" type="search" placeholder="Search order number, customer or phone"></div><div class="order-groups">'+groups.map(([label,status])=>{const list=orders.filter(o=>Array.isArray(status)?status.includes(o.status):o.status===status);return '<section class="order-group"><div class="group-heading"><h2>'+label+'</h2><span>'+list.length+'</span></div>'+(list.map(orderCard).join("")||'<div class="empty compact">No orders in this stage.</div>')+'</section>';}).join("")+'</div>';
+  return availabilityRequestsView()+'<div class="orders-toolbar"><div><b>'+orders.length+' total orders</b><span> · Latest orders appear first</span></div><input id="order-search" type="search" placeholder="Search order number, customer or phone"></div><div class="order-groups">'+groups.map(([label,status])=>{const list=orders.filter(o=>Array.isArray(status)?status.includes(o.status):o.status===status);return '<section class="order-group"><div class="group-heading"><h2>'+label+'</h2><span>'+list.length+'</span></div>'+(list.map(orderCard).join("")||'<div class="empty compact">No orders in this stage.</div>')+'</section>';}).join("")+'</div>';
 }
 function menuView(){
   const search='<div class="store-toolbar"><input id="menu-search" type="search" placeholder="Search dishes, e.g. Chicken Biryani"><select id="menu-filter"><option value="all">All items</option><option value="published">Published</option><option value="hidden">Hidden</option><option value="stock">Stock tracking on</option><option value="low">Low stock</option><option value="out">Out of stock</option></select><button class="btn" id="add-category">+ Category</button><button class="btn" id="add-item">+ Add menu item</button></div>';
@@ -180,6 +180,30 @@ function reportsView(){
   const top=Object.entries(products).sort((a,b)=>b[1]-a[1]).slice(0,6);
   const max=Math.max(1,...days.map(x=>x.sales));
   return '<section class="menu-summary"><div><span class="eyebrow">BUSINESS PERFORMANCE</span><h2>Reports & insights</h2><p>Calculated from order records currently available in the restaurant database.</p></div><div class="store-metrics"><div><small>DELIVERED ORDERS</small><b>'+delivered.length+'</b></div><div><small>DELIVERED VALUE</small><b>'+money(total)+'</b></div><div><small>AVERAGE ORDER</small><b>'+money(delivered.length?total/delivered.length:0)+'</b></div><div><small>MENU ITEMS SOLD</small><b>'+Object.values(products).reduce((a,b)=>a+b,0)+'</b></div></div></section><div class="dashboard-columns"><section class="partner-panel"><div class="panel-heading"><div><h2>Delivered sales · last 7 days</h2><p>Daily totals, based on order creation date</p></div></div><div class="sales-bars">'+days.map(d=>'<div class="sales-bar-col"><b>'+money(d.sales)+'</b><i style="height:'+Math.max(3,Math.round(d.sales/max*100))+'%"></i><small>'+d.label+'</small></div>').join("")+'</div></section><section class="partner-panel"><div class="panel-heading"><div><h2>Top dishes</h2><p>Units in delivered orders</p></div></div>'+(top.map(([name,qty],i)=>'<div class="item-row"><b>'+esc(name)+'</b><span class="top-rank">#'+(i+1)+' · '+qty+' sold</span></div>').join("")||empty("No delivered item data yet."))+'</section></div><p class="inventory-footnote">Operational summary only, not an accounting statement. Refunds, discounts, taxes and settlement may need separate reconciliation.</p>';
+}
+function availabilityRequestCard(r){
+  const items=(r.items_snapshot||[]).map(i=>esc(i.qty)+" × "+esc(i.item_name)+" ("+esc(i.variant_label)+") · "+money(i.line_total)).join("<br>");
+  const distance=r.distance_m==null?"Restaurant map pin not verified":(Number(r.distance_m).toLocaleString("en-IN")+" m · "+(r.within_radius?"inside configured radius":"outside configured radius"));
+  const pending=r.status==="pending";
+  const canApprove=pending&&r.within_radius===true;
+  return '<article class="card" style="margin:10px 0"><div class="row"><b>Delivery check · '+esc(r.customer_name)+'</b><span class="tag '+(r.status==="approved"?"s-ready":r.status==="rejected"||r.status==="expired"?"cancelled":"s-new")+'">'+esc(r.status.toUpperCase())+'</span></div>'+
+    '<p class="mute" style="margin:8px 0">'+esc(r.customer_phone)+' · '+new Date(r.created_at).toLocaleString()+'</p>'+
+    '<p class="mute">'+esc(r.address_text)+'</p><p class="mute">Distance: '+esc(distance)+'</p>'+
+    '<p style="margin:10px 0;line-height:1.7">'+(items||"No item details")+'</p>'+
+    '<div class="row"><span class="mute">Subtotal '+money(r.subtotal)+' · Delivery '+money(r.delivery_fee)+'</span><b class="price">'+money(r.total)+'</b></div>'+
+    (r.notes?'<p class="mute">Note: '+esc(r.notes)+'</p>':'')+
+    (pending?'<div class="actions"><button class="btn sm" data-avail-id="'+esc(r.id)+'" data-avail-decision="approved" '+(canApprove?"":'disabled title="Verify the restaurant pin and delivery radius first"')+'>YES — Available</button><button class="btn sm ghost" data-avail-id="'+esc(r.id)+'" data-avail-decision="rejected">NO — Not available</button></div>':'')+
+    (r.decision_reason?'<p class="mute">Decision: '+esc(r.decision_reason)+'</p>':'')+
+    (r.status==="approved"?'<p class="mute">Customer can now continue to payment. Approval expires '+new Date(r.expires_at).toLocaleString()+'</p>':'')+
+    '</article>';
+}
+function availabilityRequestsView(){
+  const pending=availabilityRequests.filter(r=>r.status==="pending");
+  const recent=availabilityRequests.filter(r=>r.status!=="pending").slice(0,5);
+  return '<section class="partner-panel"><div class="panel-heading"><div><h2>Delivery availability requests</h2><p>Review customer address and confirm delivery before payment.</p></div><span class="pill">'+pending.length+' pending</span></div>'+
+    (pending.map(availabilityRequestCard).join("")||empty("No delivery checks waiting for approval."))+
+    (recent.length?'<div class="mute" style="margin-top:16px">Recent decisions</div>'+recent.map(availabilityRequestCard).join(""):'')+
+    '</section>';
 }
 function alertsView(){
   return notifications.map(n=>'<div class="item-row"><div class="item-meta"><b>'+esc(n.title)+'</b><span class="mute">'+esc(n.body||"")+'</span><span class="mute">'+new Date(n.created_at).toLocaleString()+'</span></div>'+(n.is_read?"":'<button class="btn ghost sm" data-read="'+esc(n.id)+'">Mark read</button>')+'</div>').join("")||empty("No notifications yet.");
@@ -224,13 +248,15 @@ async function refresh(){
   }
   const results=await Promise.allSettled([api("orders"),api("menu"),api("reservations"),api("riders"),
     supabase.from("notifications").select("id,title,body,order_id,is_read,created_at").order("created_at",{ascending:false}).limit(60),
-    supabase.from("restaurant_settings").select("*").eq("id",1).single()]);
+    supabase.from("restaurant_settings").select("*").eq("id",1).single(),
+    role==="owner"?api("availability"):Promise.resolve({requests:[]})]);
   if(results[0].status==="fulfilled")orders=results[0].value.orders||[];
   if(results[1].status==="fulfilled")menuItems=results[1].value.items||[];
   if(results[2].status==="fulfilled")reservations=results[2].value.reservations||[];
   if(results[3].status==="fulfilled")riders=results[3].value.riders||[];
   if(results[4].status==="fulfilled"&&!results[4].value.error)notifications=results[4].value.data||[];
   if(results[5].status==="fulfilled"&&!results[5].value.error)settings=results[5].value.data;
+  if(results[6].status==="fulfilled")availabilityRequests=results[6].value.requests||[];
   const categoryResult=await supabase.from("menu_categories").select("id,name,active,sort_order").order("sort_order");if(!categoryResult.error)menuCategories=categoryResult.data||[];
   render();
 }
@@ -271,6 +297,18 @@ function bindActions(){
     const q=inventorySearch.value.trim().toLowerCase();
     document.querySelectorAll(".inventory-row").forEach(el=>{el.hidden=!el.textContent.toLowerCase().includes(q);});
   };
+  document.querySelectorAll("[data-avail-id]").forEach(b=>b.onclick=async()=>{
+    const decision=b.dataset.availDecision;
+    const reason=decision==="rejected"?(prompt("Optional reason for not accepting this delivery:")||""):null;
+    if(decision==="rejected"&&!confirm("Reject this delivery availability request?"))return;
+    if(decision==="approved"&&!confirm("Confirm that Hurmat Darbar can deliver to this address?"))return;
+    b.disabled=true;
+    try{
+      await api("",{action:"decide_delivery_availability",request_id:b.dataset.availId,decision,reason});
+      await refresh();
+      toast(decision==="approved"?"Delivery approved. Customer can now pay and place the order.":"Delivery request rejected.");
+    }catch(e){toast(e.message||"Availability decision failed.",true);b.disabled=false;}
+  });
   document.querySelectorAll("[data-order]").forEach(b=>b.onclick=async()=>{
     b.disabled=true;try{await api("",{action:"update_order_status",order_id:b.dataset.order,status:b.dataset.status});await refresh();toast("Order status updated.");}catch(e){toast(e.message,true);b.disabled=false;}
   });
