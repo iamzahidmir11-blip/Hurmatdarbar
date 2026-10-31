@@ -162,10 +162,16 @@ function updatePaymentInfo(){
   paymentInfo.replaceChildren();
   const method=paymentSelect.value;
   if(method==="upi_manual"&&restaurantSettings?.upi_id){
-    paymentInfo.append(el("span","","Pay using UPI to: "+restaurantSettings.upi_id+". Complete payment in your UPI app, then return here and tap Pay & Place Order. The payment remains pending until the restaurant verifies it."));
+    paymentInfo.append(el("span","","Pay Hurmat Darbar using your UPI app. After payment, return here and submit the UTR and receipt. The order stays pending until the restaurant verifies it."));
     const copy=el("button","btn ghost sm","Copy UPI ID");copy.type="button";
     copy.onclick=async()=>{try{await navigator.clipboard.writeText(restaurantSettings.upi_id);copy.textContent="Copied ✓"}catch{window.prompt("Copy UPI ID",restaurantSettings.upi_id)}};
-    paymentInfo.append(copy);paymentInfo.hidden=false;
+    const open=el("button","btn sm","Open UPI app");open.type="button";
+    open.onclick=()=>{
+      const amount=(cart.reduce((sum,line)=>sum+(Number(line.price)||0)*(Number(line.qty)||0),0)+Number(restaurantSettings.delivery_fee||0)).toFixed(2);
+      const params=new URLSearchParams({pa:restaurantSettings.upi_id,pn:"Hurmat Darbar",am:amount,cu:"INR",tn:"Hurmat Darbar order"});
+      window.location.href="upi://pay?"+params.toString();
+    };
+    paymentInfo.append(copy,open);paymentInfo.hidden=false;
   }else if(method==="cod"){
     paymentInfo.textContent="Cash on delivery selected.";paymentInfo.hidden=false;
   }else paymentInfo.hidden=true;
