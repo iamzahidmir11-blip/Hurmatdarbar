@@ -89,9 +89,11 @@ class MainActivity : Activity() {
   root.addView(button("Delivery history"){orderFilter="history";orders()})
   root.addView(button("All assigned orders"){orderFilter="all";orders()})
   root.addView(button("Refresh"){orders()})
-  root.addView(button("Sign Out"){stopLocationSharing();token=null;online=false;login()})
+  root.addView(button("Sign Out"){stopLocationSharing();clearSession();online=false;login()})
   status.text="Loading assigned orders…"
   worker.execute { try {
+   val self=request(base+"/functions/v1/restaurant-api?view=rider_self","GET",null,token)
+   online=self.optBoolean("is_online",false)
    val rows=request(base+"/functions/v1/restaurant-api","GET",null,token).optJSONArray("orders")?:JSONArray()
    runOnUiThread {
     val active=setOf("ready_for_pickup","picked_up","out_for_delivery")
