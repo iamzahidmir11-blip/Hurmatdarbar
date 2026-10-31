@@ -7,6 +7,7 @@ The connected Supabase project is `hurmat-darbar` in the Mumbai region (`ap-sout
 - Admin Android app: staff order operations and manual rider assignment.
 - Delivery Android app: rider's assigned orders and delivery updates.
 - Supabase Auth, PostgreSQL and RLS: shared identity and data layer.
+- Customer ordering now follows Check Availability → Owner YES/NO → Pay & Place Order. Availability requests are private to the customer and Owner; order creation is gated by an approved, unexpired request.
 - Edge Function `restaurant-api`: authenticated API entry point.
 
 ## Live database
@@ -15,7 +16,11 @@ The connected project already contains its own schema and migrations, including 
 ## API
 Invoke `/functions/v1/restaurant-api` with a valid Supabase user access token.
 - `GET`: list up to 100 orders; RLS limits visible rows.
-- `POST { action: "create_order", order: {...} }`: calls database RPC `create_order`.
+- `POST { action: "request_delivery_availability", request: {...} }`: saves a customer delivery check and notifies the Owner.
+- `GET ?view=availability`: Owner-only list of recent availability requests.
+- `GET ?view=availability_status&request_id=...`: customer-only status for their own request.
+- `POST { action: "decide_delivery_availability", request_id, decision, reason? }`: Owner approves or rejects the delivery request.
+- `POST { action: "create_order", order: {..., availability_request_id} }`: creates an order only through the approved availability request. Direct execution of `create_order(jsonb)` is revoked from client roles.
 - `POST { action: "assign_rider", order_id, rider_id }`: owner/manager/delivery-manager; database RPC validates rider and order state.
 - `POST { action: "update_order_status", order_id, status, reason? }`: database RPC enforces transitions and role permissions.
 - `POST { action: "post_location", order_id, lat, lng, accuracy? }`: rider-only; database RPC verifies assignment and rate-limits writes.
