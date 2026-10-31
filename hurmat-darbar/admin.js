@@ -15,7 +15,7 @@ const statusNames = {
   ready_for_pickup:"Ready for pickup", picked_up:"Picked up", out_for_delivery:"Out for delivery",
   delivered:"Delivered", cancelled:"Cancelled", rejected:"Rejected", delivery_failed:"Delivery failed"
 };
-const tabs = [["home","⌂","Overview"],["orders","▤","Orders"],["menu","▦","Menu"],["inventory","▣","Inventory"],["payments","₹","Payments"],["reservations","◷","Bookings"],["riders","♧","Riders"],["reports","▥","Reports"],["settings","⚙","Store setup"],["alerts","♢","Alerts"]];
+const tabs = [["home","⌂","Overview"],["orders","▤","Orders"],["menu","▦","Menu"],["inventory","▣","Inventory"],["availability","✓","Delivery checks"],["payments","₹","Payments"],["reservations","◷","Bookings"],["riders","♧","Riders"],["reports","▥","Reports"],["settings","⚙","Store setup"],["alerts","♢","Alerts"]];
 // Temporary development-only UI preview. Live data and all write operations remain protected.
 const DEVELOPMENT_PREVIEW = false;
 let user=null, role=null, page="home", orders=[], menuItems=[], menuCategories=[], reservations=[], riders=[], notifications=[], availabilityRequests=[], availabilityLoadError="", payments=[], settings=null, channel=null, busy=false, availabilityRefreshTimer=null;
