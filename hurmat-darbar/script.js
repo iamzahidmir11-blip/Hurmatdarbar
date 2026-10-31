@@ -360,6 +360,10 @@ function renderMyOrders(data,payments){
     card.append(el("p","my-order-meta","Payment: "+o.payment_method+" · "+(o.payment_status==="paid"?"Paid":o.payment_status==="cod_pending"?"Cash on delivery":"Payment pending")));
     const proofs=payments.filter(p=>p.order_id===o.id);
     if(proofs.length)card.append(el("p","my-order-meta","UPI proof: "+proofs[0].status+(proofs[0].review_note?" · "+proofs[0].review_note:"")));
+    if(o.live?.history?.length){const timeline=el("div","my-order-timeline");o.live.history.slice(-5).forEach(h=>timeline.append(el("small","",String(h.status).replaceAll("_"," ")+" · "+new Date(h.at).toLocaleString())));card.append(timeline);}
+    if(o.live?.rider){card.append(el("p","my-order-meta","Rider: "+o.live.rider.name+(o.live.rider.phone?" · "+o.live.rider.phone:"")));}
+    if(o.live?.rider_location?.lat&&o.live?.rider_location?.lng){const a=el("a","my-order-map","View rider location ↗");a.href="https://www.google.com/maps?q="+o.live.rider_location.lat+","+o.live.rider_location.lng;a.target="_blank";a.rel="noopener";card.append(a);}
+
     if(o.payment_method==="upi_manual"&&o.payment_status!=="paid"&&(!proofs.length||proofs[0].status==="rejected")){
       const form=el("div","my-order-proof-form"),ref=el("input",""),file=el("input","");
       ref.placeholder="UPI UTR / reference number";ref.maxLength=80;file.type="file";file.accept="image/jpeg,image/png,image/webp";
@@ -386,7 +390,15 @@ function renderMyOrders(data,payments){
 }
 async function loadMyOrders(){
   if(!myOrdersRoot)return;
-  try{const data=await callRestaurantApi("GET","view=my_orders");renderMyOrders(data.orders||[],data.payments||[]);}
+  try{
+    const data=await callRestaurantApi("GET","view=my_orders");
+    const enriched=await Promise.all((data.orders||[]).slice(0,12).map(async o=>{
+      if(["delivered","cancelled","rejected","delivery_failed"].includes(o.status))return o;
+      const {data:live}=await db.rpc("track_order",{p_token:o.tracking_token});
+      return {...o,live:live||null};
+    }));
+    renderMyOrders(enriched,data.payments||[]);
+  }
   catch(e){myOrdersRoot.textContent="Your order history will appear here after you place an order on this device.";}
 }
 
