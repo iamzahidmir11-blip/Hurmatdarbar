@@ -594,6 +594,13 @@ body:has(.auth-card) .auth-card:after{
 }
 @media(prefers-reduced-motion:reduce){.auth-card input,.auth-card .btn.wide{transition:none}}
 
+
+/* Simple sign-in: no recovery, signup, activation or green CTA on the login screen */
+.auth-kicker{display:block;text-align:center;color:#a77a38;font-size:9px;font-weight:800;letter-spacing:.2em;margin:0 0 11px}
+.auth-footnote{margin:18px 0 0!important;text-align:center!important;color:#879188!important;font-size:10px!important;line-height:1.65!important}
+.auth-card .btn.wide{background:linear-gradient(105deg,#29312d,#414943)!important;box-shadow:0 8px 20px rgba(35,44,38,.15)!important}
+.auth-card .btn.wide:hover{background:linear-gradient(105deg,#38423b,#515c53)!important}
+
 </style></head>
 <body style="margin:0;min-height:100vh;background:#0e1b14;color:#f4efe0;font-family:system-ui,-apple-system,sans-serif">
 <div id="app" class="wrap">
