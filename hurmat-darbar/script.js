@@ -94,13 +94,22 @@ const orderHelp=el("small","","Add items and delivery details, then request conf
 orderHelp.id="order-help";
 const paymentInfo=el("div","payment-note");
 paymentInfo.id="payment-info";
+const paymentProofBox=el("div","payment-proof-fields");
+paymentProofBox.id="payment-proof-fields";
+const paymentRefLabel=el("label","","UPI transaction reference / UTR");paymentRefLabel.htmlFor="upi-reference";
+const paymentRefInput=el("input","");paymentRefInput.id="upi-reference";paymentRefInput.maxLength=80;paymentRefInput.placeholder="Enter UPI UTR / reference number";
+const paymentShotLabel=el("label","","Payment screenshot (JPG, PNG or WebP · max 5 MB)");paymentShotLabel.htmlFor="upi-screenshot";
+const paymentShotInput=el("input","");paymentShotInput.id="upi-screenshot";paymentShotInput.type="file";paymentShotInput.accept="image/jpeg,image/png,image/webp";
+paymentProofBox.append(paymentRefLabel,paymentRefInput,paymentShotLabel,paymentShotInput);
+
 const checkoutButton=document.getElementById("checkout");
 checkoutButton.textContent="Check Availability";
 checkoutButton.insertAdjacentElement("beforebegin",paymentLabel);
 checkoutButton.insertAdjacentElement("beforebegin",paymentSelect);
 checkoutButton.insertAdjacentElement("beforebegin",paymentInfo);
+checkoutButton.insertAdjacentElement("beforebegin",paymentProofBox);
 checkoutButton.insertAdjacentElement("afterend",orderHelp);
-paymentLabel.hidden=true;paymentSelect.hidden=true;paymentInfo.hidden=true;
+paymentLabel.hidden=true;paymentSelect.hidden=true;paymentInfo.hidden=true;paymentProofBox.hidden=true;
 paymentSelect.onchange=checkoutState;
 
 function clearAvailability(message){
@@ -176,12 +185,12 @@ function checkoutState(){
   const availabilityReady=cart.length>0&&stockOk&&!!restaurantSettings?.is_open&&enough;
   const orderReady=availabilityReady&&methods.length>0;
   if(availabilityApproved){
-    paymentLabel.hidden=false;paymentSelect.hidden=false;updatePaymentInfo();
+    paymentLabel.hidden=false;paymentSelect.hidden=false;updatePaymentInfo();paymentProofBox.hidden=paymentSelect.value!=="upi_manual";
     checkoutButton.textContent=paymentSelect.value==="upi_manual"?"Pay & Place Order":"Place Order";
     checkoutButton.disabled=!orderReady||placingOrder||!paymentSelect.value;
     orderHelp.textContent=availabilityMessage||"Delivery approved. Choose payment and place your order.";
   }else{
-    paymentLabel.hidden=true;paymentSelect.hidden=true;paymentInfo.hidden=true;
+    paymentLabel.hidden=true;paymentSelect.hidden=true;paymentInfo.hidden=true;paymentProofBox.hidden=true;
     checkoutButton.textContent=availabilityRequestId?(availabilityPolling?"Waiting for Owner…":"Check approval status"):"Check Availability";
     checkoutButton.disabled=!availabilityReady||placingOrder||availabilityPolling;
     orderHelp.textContent=availabilityRequestId?"Your request has been sent to Hurmat Darbar. Waiting for the Owner to confirm delivery.":!cart.length?"Add at least one menu item before checking delivery availability.":!stockOk?"One or more products no longer have enough stock. Update your bag quantity.":!restaurantSettings?"Restaurant setup could not be loaded.":!restaurantSettings.is_open?"The restaurant is currently not accepting orders.":!enough?"Minimum order is "+money(restaurantSettings.min_order)+". Add more items to continue.":availabilityMessage||"Check delivery availability first. Payment is selected only after Owner approval.";
@@ -255,23 +264,40 @@ async function placeApprovedOrder(){
   const idempotencyKey=availabilityPayload.idempotency_key||(crypto.randomUUID?crypto.randomUUID():"hd-"+Date.now()+"-"+Math.random().toString(36).slice(2));
   availabilityPayload.idempotency_key=idempotencyKey;
   localStorage.setItem("hd-availability-payload",JSON.stringify(availabilityPayload));
-  const order={...availabilityPayload,payment_method:paymentSelect.value,idempotency_key:idempotencyKey,availability_request_id:availabilityRequestId};
+  const method=paymentSelect.value;
+  const reference=paymentRefInput.value.trim();
+  const proofFile=paymentShotInput.files?.[0]||null;
+  if(method==="upi_manual"){
+    if(reference.length<6||reference.length>80)throw new Error("Enter the UPI transaction reference / UTR number.");
+    if(!proofFile)throw new Error("Attach your UPI payment screenshot before placing the order.");
+    if(!["image/jpeg","image/png","image/webp"].includes(proofFile.type)||proofFile.size>5*1024*1024)throw new Error("Choose a JPG, PNG or WebP screenshot up to 5 MB.");
+  }
+  const order={...availabilityPayload,payment_method:method,idempotency_key:idempotencyKey,availability_request_id:availabilityRequestId};
   const result=await callRestaurantApi("POST","",{action:"create_order",order});
   const savedOrder=result.order||{};
+  if(method==="upi_manual"&&savedOrder.order_id){
+    const {data:{user}}=await db.auth.getUser();
+    const ext=proofFile.type==="image/png"?"png":proofFile.type==="image/webp"?"webp":"jpg";
+    const path=user.id+"/"+savedOrder.order_id+"/"+Date.now()+"."+ext;
+    const {data:uploaded,error:uploadError}=await db.storage.from("payment-proofs").upload(path,proofFile,{cacheControl:"3600",upsert:false,contentType:proofFile.type});
+    if(uploadError)throw new Error("Order created, but screenshot upload failed. Open My Orders and submit the payment proof again.");
+    await callRestaurantApi("POST","",{action:"submit_upi_payment_proof",order_id:savedOrder.order_id,reference,screenshot_path:uploaded.path});
+  }
   cart=[];localStorage.setItem("hd-cart","[]");
   localStorage.removeItem("hd-availability-request");localStorage.removeItem("hd-availability-payload");
   availabilityRequestId="";availabilityPayload=null;availabilityApproved=false;availabilityPolling=false;
   renderCart();toggleCart(false);
   const success=document.getElementById("order-success"),token=savedOrder.tracking_token||"";
-  document.getElementById("success-copy").textContent="Order #"+(savedOrder.order_no||"—")+" has been sent to Hurmat Darbar. Payment status: pending restaurant verification. Total: "+money(savedOrder.total||0)+".";
+  document.getElementById("success-copy").textContent="Order #"+(savedOrder.order_no||"—")+" has been received. "+(method==="upi_manual"?"Your UPI reference and screenshot are submitted for verification. The order will be confirmed after approval.":"Your order is awaiting restaurant confirmation.")+" Total: "+money(savedOrder.total||0)+".";
   document.getElementById("success-token").textContent=token||"Tracking reference unavailable";
   if(success)success.hidden=false;
   document.getElementById("customer-name").value="";
   document.getElementById("customer-phone").value="";
   document.getElementById("customer-address").value="";
   document.getElementById("customer-notes").value="";
-  availabilityMessage="";
+  availabilityMessage="";paymentRefInput.value="";paymentShotInput.value="";
   checkoutState();
+  await loadMyOrders();
 }
 checkoutButton.onclick=async()=>{
   if(placingOrder)return;
@@ -308,7 +334,7 @@ async function load(){
   renderCats(a.data||[]);
   status.textContent=items.length+" menu items loaded · live restaurant prices";
   const search=el("input","menu-search");search.placeholder="Search dishes, drinks and more…";search.oninput=()=>{query=search.value.toLowerCase().trim();render();};
-  const tools=el("div","menu-tools");tools.append(search);cats.after(tools);render();renderCart();checkoutState();resumeAvailability();
+  const tools=el("div","menu-tools");tools.append(search);cats.after(tools);render();renderCart();checkoutState();resumeAvailability();loadMyOrders();if(window.hdOrdersTimer)clearInterval(window.hdOrdersTimer);window.hdOrdersTimer=setInterval(()=>{if(!document.hidden)loadMyOrders()},8000);
 }
 renderCart();load();if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}))}
 const reservationForm=document.getElementById("reservation-form");
@@ -321,6 +347,49 @@ if(reservationForm)reservationForm.addEventListener("submit",async e=>{
  catch(err){message.textContent="Could not send request: "+(err.message||"Please call the restaurant.");}
  finally{button.disabled=false;button.textContent="Request reservation ↗";}
 });
+
+const myOrdersRoot=document.getElementById("my-orders-list");
+const orderStatusLabels={pending_confirmation:"Awaiting restaurant confirmation",confirmed:"Confirmed",preparing:"Being prepared",ready_for_pickup:"Ready for pickup",picked_up:"Picked up",out_for_delivery:"Out for delivery",delivered:"Delivered",cancelled:"Cancelled",rejected:"Rejected",delivery_failed:"Delivery issue"};
+function renderMyOrders(data,payments){
+  if(!myOrdersRoot)return;myOrdersRoot.replaceChildren();
+  if(!data.length){myOrdersRoot.append(el("p","my-orders-empty","Your placed orders will appear here."));return;}
+  data.forEach(o=>{
+    const card=el("article","my-order-card"),head=el("div","my-order-head"),title=el("b","","Order #"+o.order_no),tag=el("span","my-order-status",orderStatusLabels[o.status]||o.status);
+    head.append(title,tag);card.append(head,el("p","my-order-meta",new Date(o.created_at).toLocaleString()+" · "+money(o.total)));
+    (o.order_items||[]).forEach(i=>card.append(el("p","my-order-line",i.qty+" × "+i.item_name+" ("+i.variant_label+")")));
+    card.append(el("p","my-order-meta","Payment: "+o.payment_method+" · "+(o.payment_status==="paid"?"Paid":o.payment_status==="cod_pending"?"Cash on delivery":"Payment pending")));
+    const proofs=payments.filter(p=>p.order_id===o.id);
+    if(proofs.length)card.append(el("p","my-order-meta","UPI proof: "+proofs[0].status+(proofs[0].review_note?" · "+proofs[0].review_note:"")));
+    if(o.payment_method==="upi_manual"&&o.payment_status!=="paid"&&(!proofs.length||proofs[0].status==="rejected")){
+      const form=el("div","my-order-proof-form"),ref=el("input",""),file=el("input","");
+      ref.placeholder="UPI UTR / reference number";ref.maxLength=80;file.type="file";file.accept="image/jpeg,image/png,image/webp";
+      const submit=el("button","btn primary","Submit payment proof");submit.type="button";
+      submit.onclick=async()=>{
+        const f=file.files?.[0],v=ref.value.trim();
+        if(v.length<6||!f){alert("Enter UPI reference and attach screenshot.");return;}
+        if(!["image/jpeg","image/png","image/webp"].includes(f.type)||f.size>5*1024*1024){alert("Screenshot must be JPG, PNG or WebP up to 5 MB.");return;}
+        submit.disabled=true;submit.textContent="Uploading…";
+        try{
+          const {data:{user}}=await db.auth.getUser();const ext=f.type==="image/png"?"png":f.type==="image/webp"?"webp":"jpg";
+          const path=user.id+"/"+o.id+"/"+Date.now()+"."+ext;
+          const {data:up,error}=await db.storage.from("payment-proofs").upload(path,f,{upsert:false,contentType:f.type});
+          if(error)throw error;
+          await callRestaurantApi("POST","",{action:"submit_upi_payment_proof",order_id:o.id,reference:v,screenshot_path:up.path});
+          await loadMyOrders();alert("Payment proof submitted. Waiting for restaurant verification.");
+        }catch(e){alert(e.message||"Could not submit payment proof.");submit.disabled=false;submit.textContent="Submit payment proof";}
+      };
+      form.append(ref,file,submit);card.append(form);
+    }
+    const track=el("button","btn ghost sm","Refresh live status");track.type="button";track.onclick=()=>loadMyOrders();card.append(track);
+    myOrdersRoot.append(card);
+  });
+}
+async function loadMyOrders(){
+  if(!myOrdersRoot)return;
+  try{const data=await callRestaurantApi("GET","view=my_orders");renderMyOrders(data.orders||[],data.payments||[]);}
+  catch(e){myOrdersRoot.textContent="Your order history will appear here after you place an order on this device.";}
+}
+
 const trackingForm=document.getElementById("tracking-form");
 if(trackingForm)trackingForm.addEventListener("submit",async e=>{
  e.preventDefault();const button=trackingForm.querySelector("button[type=submit]"),box=document.getElementById("tracking-result"),token=document.getElementById("tracking-token").value.trim();
