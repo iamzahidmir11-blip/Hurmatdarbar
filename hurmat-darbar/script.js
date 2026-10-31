@@ -366,6 +366,8 @@ function applyCustomerGate(){
 db.auth.onAuthStateChange((event,session)=>{
   document.body.classList.toggle("customer-locked",!session?.user||session.user.is_anonymous);
 });
+// Keep the page locked until Supabase confirms a registered customer session.
+applyCustomerGate();
 function customerAuthMessage(message,bad=false){
   const node=document.getElementById("customer-auth-message");
   if(node){node.textContent=message;node.style.color=bad?"#a33":"inherit";}
@@ -374,7 +376,7 @@ function setCustomerAuthMode(mode){
   customerAuthMode=mode;
   const signup=mode==="signup";
   document.getElementById("customer-auth-title").textContent=signup?"Create your account":"Welcome back";
-  document.getElementById("customer-auth-help").textContent=signup?"Use your Gmail address and create a password. No OTP is required when email confirmation is disabled.":"Log in with the email address and password you registered with.";
+  document.getElementById("customer-auth-help").textContent=signup?"Create an account with your email address and a password to unlock the menu and ordering.":"Log in with the email address and password you registered with.";
   document.getElementById("account-name").required=signup;
   document.getElementById("account-name").hidden=!signup;
   document.getElementById("account-phone").hidden=!signup;
