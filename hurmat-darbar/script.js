@@ -306,6 +306,8 @@ async function placeApprovedOrder(){
   await loadMyOrders();
 }
 checkoutButton.onclick=async()=>{
+  const {data:{user}}=await db.auth.getUser();
+  if(!user||user.is_anonymous){document.body.classList.add("customer-locked");customerAuthMessage("Create an account or log in before placing an order.",true);return;}
   if(placingOrder)return;
   placingOrder=true;checkoutButton.disabled=true;
   try{
