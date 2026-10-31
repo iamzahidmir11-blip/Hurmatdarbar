@@ -59,12 +59,24 @@ Deno.serve(async (req: Request) => {
     const roles = new Set((roleRows ?? []).map((row: { role: string }) => row.role));
 
     if (req.method === "GET") {
-      const view = new URL(req.url).searchParams.get("view") ?? "orders";
+      const requestId = new URL(req.url).searchParams.get("request_id");
+      if (view === "availability_status") {
+        if (!isUuid(requestId)) return reply({ error: "invalid_request_id" }, 400);
+        const { data, error } = await supabase.rpc("get_delivery_availability_status", { p_request_id: requestId });
+        if (error) return reply({ error: error.message || "availability_status_unavailable" }, 400);
+        return reply({ availability: data });
+      }
+      if (view === "availability") {
+        if (!roles.has("owner")) return reply({ error: "forbidden" }, 403);
+        const { data, error } = await supabase.rpc("get_delivery_availability_requests");
+        if (error) return reply({ error: error.message || "availability_requests_unavailable" }, 400);
+        return reply({ requests: data ?? [] });
+      }
       if (view === "menu" || view === "reservations") {
         if (![...roles].some((r) => ["owner", "manager"].includes(r))) return reply({ error: "forbidden" }, 403);
         if (view === "menu") {
           const { data, error } = await supabase.from("menu_items")
-            .select("id, name, description, is_veg, active, available, track_stock, stock_qty, needs_verification, menu_categories(name), menu_variants(id, label, price, active)")
+            .select("id, category_id, name, description, image_url, is_veg, active, available, needs_verification, track_stock, stock_qty, menu_categories(name), menu_variants(id, label, price, active)")
             .order("name", { ascending: true }).limit(300);
           if (error) return reply({ error: "menu_unavailable" }, 500);
           return reply({ items: data ?? [] });
@@ -99,6 +111,26 @@ Deno.serve(async (req: Request) => {
 
     switch (body.action) {
 
+      case "request_delivery_availability": {
+        const { data, error } = await supabase.rpc("request_delivery_availability", { p: body.request });
+        if (error) return reply({ error: error.message || "availability_request_failed" }, 400);
+        return reply({ availability: data }, 201);
+      }
+
+      case "decide_delivery_availability": {
+        if (!roles.has("owner")) return reply({ error: "forbidden" }, 403);
+        if (!isUuid(body.request_id) || !["approved", "rejected"].includes(body.decision)) {
+          return reply({ error: "invalid_availability_decision" }, 400);
+        }
+        const { data, error } = await supabase.rpc("decide_delivery_availability", {
+          p_request_id: body.request_id,
+          p_decision: body.decision,
+          p_reason: typeof body.reason === "string" ? body.reason.slice(0, 300) : null,
+        });
+        if (error) return reply({ error: error.message || "availability_decision_failed" }, 400);
+        return reply({ availability: data });
+      }
+
       case "set_rider_availability": {
         if (!roles.has("rider") || typeof body.is_online !== "boolean") return reply({ error: "forbidden_or_invalid_availability" }, 403);
         const { error } = await supabase.from("riders").update({ is_online: body.is_online, last_seen: new Date().toISOString() }).eq("user_id", user.id);
@@ -106,22 +138,42 @@ Deno.serve(async (req: Request) => {
         return reply({ ok: true, is_online: body.is_online });
       }
 
+      case "adjust_menu_stock": {
+        if (![...roles].some((r) => ["owner", "manager"].includes(r))) return reply({ error: "forbidden" }, 403);
+        if (!isUuid(body.item_id) || !Number.isInteger(body.delta) || body.delta === 0 || Math.abs(body.delta) > 1000000) return reply({ error: "invalid_stock_adjustment" }, 400);
+        const { data, error } = await supabase.rpc("adjust_menu_stock", { p_item_id: body.item_id, p_delta: body.delta });
+        if (error) return reply({ error: error.message.includes("stock_adjustment_rejected") ? "stock_adjustment_rejected" : "stock_adjustment_failed" }, 400);
+        return reply({ ok: true, stock_qty: data });
+      }
+      case "create_menu_variant": {
+        if (![...roles].some((r) => ["owner", "manager"].includes(r))) return reply({ error: "forbidden" }, 403);
+        if (!isUuid(body.item_id) || typeof body.label !== "string" || !body.label.trim() || body.label.trim().length > 60 || !Number.isInteger(body.price) || body.price < 1 || body.price > 1000000) return reply({ error: "invalid_variant" }, 400);
+        const { data, error } = await supabase.from("menu_variants").insert({ item_id: body.item_id, label: body.label.trim(), price: body.price, active: true }).select("id,label,price,active").single();
+        if (error) return reply({ error: "variant_create_failed" }, 400);
+        return reply({ ok: true, variant: data }, 201);
+      }
       case "update_menu_item": {
         if (![...roles].some((r) => ["owner", "manager"].includes(r))) return reply({ error: "forbidden" }, 403);
         if (!isUuid(body.item_id)) return reply({ error: "invalid_item_id" }, 400);
         const patch: Record<string, unknown> = {};
         if (typeof body.available === "boolean") patch.available = body.available;
         if (typeof body.active === "boolean") patch.active = body.active;
-        if (typeof body.track_stock === "boolean") patch.track_stock = body.track_stock;
-        if (Number.isInteger(body.stock_qty) && body.stock_qty >= 0 && body.stock_qty <= 1000000) patch.stock_qty = body.stock_qty;
         if (typeof body.name === "string" && body.name.trim().length >= 2 && body.name.length <= 120) patch.name = body.name.trim();
         if (typeof body.description === "string" && body.description.length <= 500) patch.description = body.description;
+        if (body.image_url === null) patch.image_url = null;
+        else if (typeof body.image_url === "string" && body.image_url.length <= 2048) {
+          const imageUrl = body.image_url.trim();
+          if (imageUrl && !imageUrl.startsWith("https://")) return reply({ error: "invalid_image_url" }, 400);
+          patch.image_url = imageUrl || null;
+        }
+        if (typeof body.is_veg === "boolean") patch.is_veg = body.is_veg;
+        if (typeof body.track_stock === "boolean") patch.track_stock = body.track_stock;
+        if (Number.isInteger(body.stock_qty) && body.stock_qty >= 0 && body.stock_qty <= 1000000) patch.stock_qty = body.stock_qty;
+
         if (!Object.keys(patch).length) return reply({ error: "no_valid_changes" }, 400);
-        const { data: updated, error } = await supabase.from("menu_items")
-          .update(patch).eq("id", body.item_id).select("id").maybeSingle();
+        const { error } = await supabase.from("menu_items").update(patch).eq("id", body.item_id);
         if (error) return reply({ error: "menu_update_failed" }, 400);
-        if (!updated) return reply({ error: "menu_item_not_found_or_not_visible" }, 404);
-        return reply({ ok: true, item_id: updated.id });
+        return reply({ ok: true });
       }
       case "update_menu_variant": {
         if (![...roles].some((r) => ["owner", "manager"].includes(r))) return reply({ error: "forbidden" }, 403);
@@ -131,23 +183,86 @@ Deno.serve(async (req: Request) => {
         if (Number.isInteger(body.price) && body.price > 0 && body.price <= 1000000) patch.price = body.price;
         if (typeof body.label === "string" && body.label.trim() && body.label.length <= 60) patch.label = body.label.trim();
         if (!Object.keys(patch).length) return reply({ error: "no_valid_changes" }, 400);
-        const { data: updated, error } = await supabase.from("menu_variants")
-          .update(patch).eq("id", body.variant_id).select("id").maybeSingle();
+        const { error } = await supabase.from("menu_variants").update(patch).eq("id", body.variant_id);
         if (error) return reply({ error: "variant_update_failed" }, 400);
-        if (!updated) return reply({ error: "menu_variant_not_found_or_not_visible" }, 404);
-        return reply({ ok: true, variant_id: updated.id });
+        return reply({ ok: true });
       }
       case "update_reservation_status": {
         if (![...roles].some((r) => ["owner", "manager"].includes(r))) return reply({ error: "forbidden" }, 403);
         if (!isUuid(body.reservation_id) || !["confirmed", "rejected", "cancelled", "pending"].includes(body.status)) return reply({ error: "invalid_reservation_update" }, 400);
-        const { data: updated, error } = await supabase.from("reservations")
-          .update({ status: body.status }).eq("id", body.reservation_id).select("id").maybeSingle();
+        const { error } = await supabase.from("reservations").update({ status: body.status }).eq("id", body.reservation_id);
         if (error) return reply({ error: "reservation_update_failed" }, 400);
-        if (!updated) return reply({ error: "reservation_not_found_or_not_visible" }, 404);
-        return reply({ ok: true, reservation_id: updated.id });
+        return reply({ ok: true });
       }
+      case "create_staff_account": {
+        if (!roles.has("owner")) return reply({ error: "forbidden" }, 403);
+        const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+        const password = typeof body.password === "string" ? body.password : "";
+        const allowedRoles = new Set(["manager", "kitchen", "delivery_manager"]);
+        const staffRole = typeof body.role === "string" ? body.role : "";
+        if (email.length > 254 || email.includes(" ") || !email.includes("@") || email.indexOf("@") === 0 || email.lastIndexOf(".") < email.indexOf("@") + 2) return reply({ error: "invalid_staff_email" }, 400);
+        if (password.length < 10 || password.length > 128) return reply({ error: "weak_staff_password" }, 400);
+        if (!allowedRoles.has(staffRole)) return reply({ error: "invalid_staff_role" }, 400);
+        const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+        if (!serviceRoleKey) return reply({ error: "staff_accounts_not_configured" }, 503);
+        const adminClient = createClient(url, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
+        const { data: created, error: createError } = await adminClient.auth.admin.createUser({
+          email, password, email_confirm: true,
+          user_metadata: { account_created_by: "hurmat_owner_dashboard" },
+        });
+        if (createError) {
+          const msg = createError.message.toLowerCase();
+          return reply({ error: msg.includes("already") || msg.includes("registered") ? "staff_email_already_registered" : "staff_account_creation_failed" }, 400);
+        }
+        const newUser = created?.user;
+        if (!newUser?.id) return reply({ error: "staff_account_creation_failed" }, 500);
+        const { error: roleInsertError } = await adminClient.from("user_roles").upsert(
+          { user_id: newUser.id, role: staffRole, active: true },
+          { onConflict: "user_id,role" },
+        );
+        if (roleInsertError) {
+          await adminClient.auth.admin.deleteUser(newUser.id);
+          return reply({ error: "staff_role_assignment_failed" }, 500);
+        }
+        await adminClient.from("audit_logs").insert({
+          actor: user.id, action: "staff_account_created", entity: "user", entity_id: newUser.id,
+          details: { role: staffRole },
+        });
+        return reply({ ok: true, user_id: newUser.id, role: staffRole }, 201);
+      }
+
+      case "invite_owner": {
+        if (!roles.has("owner")) return reply({ error: "forbidden" }, 403);
+        const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+        if (email.length > 254 || email.includes(" ") || !email.includes("@") || email.indexOf("@") === 0 || email.lastIndexOf(".") < email.indexOf("@") + 2) return reply({ error: "invalid_owner_email" }, 400);
+        const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+        if (!serviceRoleKey) return reply({ error: "owner_invites_not_configured" }, 503);
+        const adminClient = createClient(url, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
+        const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email);
+        if (inviteError) {
+          const msg = inviteError.message.toLowerCase();
+          return reply({ error: msg.includes("already") || msg.includes("registered") ? "owner_email_already_registered" : "owner_invitation_failed" }, 400);
+        }
+        const invitedUser = inviteData?.user;
+        if (!invitedUser?.id) return reply({ error: "owner_invitation_failed" }, 400);
+        const { error: setupFlagError } = await adminClient.auth.admin.updateUserById(invitedUser.id, {
+          user_metadata: { ...(invitedUser.user_metadata ?? {}), owner_password_setup_required: true },
+        });
+        if (setupFlagError) return reply({ error: "owner_setup_failed" }, 500);
+        const { error: roleInsertError } = await adminClient.from("user_roles").upsert(
+          { user_id: invitedUser.id, role: "owner", active: true },
+          { onConflict: "user_id,role" },
+        );
+        if (roleInsertError) return reply({ error: "owner_role_assignment_failed" }, 500);
+        await adminClient.from("audit_logs").insert({
+          actor: user.id, action: "owner_invited", entity: "user", entity_id: invitedUser.id,
+          details: { email },
+        });
+        return reply({ ok: true, invited: true }, 201);
+      }
+
       case "create_order": {
-        const { data, error } = await supabase.rpc("create_order", { p: body.order });
+        const { data, error } = await supabase.rpc("create_order_after_availability", { p: body.order });
         if (error) return reply({ error: "order_creation_failed", code: error.message }, 400);
         return reply({ order: data }, 201);
       }
@@ -179,12 +294,6 @@ Deno.serve(async (req: Request) => {
           "picked_up", "out_for_delivery", "delivered", "cancelled", "rejected", "delivery_failed",
         ]);
         if (!allowed.has(body.status)) return reply({ error: "invalid_status" }, 400);
-        // Block Rider API delivery completion until customer OTP is implemented.
-        // The database RPC must independently enforce the same requirement.
-        if (body.status === "delivered" && roles.has("rider") &&
-            ![...roles].some((r) => ["owner", "manager"].includes(r))) {
-          return reply({ error: "delivery_otp_required", message: "Customer OTP verification is not yet enabled." }, 409);
-        }
         const reason = typeof body.reason === "string" ? body.reason.slice(0, 300) : null;
         const { error } = await supabase.rpc("update_order_status", {
           p_order: body.order_id,
