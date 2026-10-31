@@ -1,6 +1,8 @@
 package com.hurmatdarbar.delivery
 import android.app.Activity
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.graphics.Color
 import android.content.Intent
 import android.net.Uri
@@ -20,6 +22,17 @@ class MainActivity : Activity() {
  private val base="https://rvrboufrnkzuptfjopwd.supabase.co"
  private val apiKey="sb_publishable_n1PWbHcomKpd63FPDdWSEw_iSo6UTi0"
  private val worker=Executors.newSingleThreadExecutor()
+ private val pollHandler=Handler(Looper.getMainLooper())
+ private var polling=false
+ private var firstOrdersLoad=true
+ private val knownOrderIds=mutableSetOf<String>()
+ private val pollTask=object:Runnable {
+  override fun run() {
+   if(token.isNullOrBlank()){polling=false;return}
+   if(!isFinishing && hasWindowFocus()) orders()
+   pollHandler.postDelayed(this,20000L)
+  }
+ }
  private var token:String?=null
  private var refreshToken:String?=null
  private var online=false
@@ -82,19 +95,37 @@ class MainActivity : Activity() {
    } catch(ex:Exception){runOnUiThread{status.text=message(ex)}} }
   })
  }
+ private fun startPolling() {
+  if(polling)return
+  polling=true
+  pollHandler.postDelayed(pollTask,20000L)
+ }
+ private fun stopPolling() {
+  polling=false
+  pollHandler.removeCallbacks(pollTask)
+ }
  private fun orders() {
+  startPolling()
   setup("My Deliveries")
   root.addView(button(if(online) "Go Offline" else "Go Online"){availability(!online)})
   root.addView(button("Active deliveries"){orderFilter="active";orders()})
   root.addView(button("Delivery history"){orderFilter="history";orders()})
   root.addView(button("All assigned orders"){orderFilter="all";orders()})
   root.addView(button("Refresh"){orders()})
-  root.addView(button("Sign Out"){stopLocationSharing();clearSession();online=false;login()})
+  root.addView(button("Sign Out"){stopPolling();stopLocationSharing();clearSession();online=false;knownOrderIds.clear();firstOrdersLoad=true;login()})
   status.text="Loading assigned orders…"
   worker.execute { try {
    val self=request(base+"/functions/v1/restaurant-api?view=rider_self","GET",null,token)
    online=self.optBoolean("is_online",false)
    val rows=request(base+"/functions/v1/restaurant-api","GET",null,token).optJSONArray("orders")?:JSONArray()
+   val loaded=(0 until rows.length()).mapNotNull { rows.optJSONObject(it) }
+   val ids=loaded.map { it.optString("id") }.filter { it.isNotBlank() }
+   val newlyAssigned=if(firstOrdersLoad){firstOrdersLoad=false;knownOrderIds.addAll(ids);emptyList()}else loaded.filter { !knownOrderIds.contains(it.optString("id")) }
+   knownOrderIds.addAll(ids)
+   if(newlyAssigned.isNotEmpty()) runOnUiThread {
+    val numbers=newlyAssigned.take(3).joinToString(", ") { "#"+it.optString("order_no") }
+    Toast.makeText(this,"New delivery assigned: "+numbers,Toast.LENGTH_LONG).show()
+   }
    runOnUiThread {
     val active=setOf("ready_for_pickup","picked_up","out_for_delivery")
     val history=setOf("delivered","delivery_failed","cancelled","rejected")
@@ -203,5 +234,5 @@ class MainActivity : Activity() {
   m.contains("riders")||m.contains("availability")->"Rider profile missing or unavailable. Ask owner to register this rider."
   else->m.take(180)
  }}
- override fun onDestroy(){worker.shutdownNow();super.onDestroy()}
+ override fun onDestroy(){stopPolling();worker.shutdownNow();super.onDestroy()}
 }
