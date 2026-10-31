@@ -55,7 +55,7 @@ function passwordSetupView(){
   document.getElementById("owner-password-form").onsubmit=async e=>{
     e.preventDefault();
     const password=document.getElementById("owner-new-password").value,confirmPassword=document.getElementById("owner-confirm-password").value,button=document.getElementById("owner-password-submit");
-    if(password.length<10){toast("Use at least 10 characters.",true);return;}
+    if(password.length<10||!/[a-z]/.test(password)||!/[A-Z]/.test(password)||!/[0-9]/.test(password)||!/[^A-Za-z0-9]/.test(password)){toast("Use 10+ characters with uppercase, lowercase, a number and a symbol.",true);return;}
     if(password!==confirmPassword){toast("Passwords do not match.",true);return;}
     button.disabled=true;button.textContent="Saving securely…";
     try{const {error}=await supabase.auth.updateUser({password,data:{owner_password_setup_required:false}});if(error)throw error;await verifyAccess();await startApp();}
@@ -472,7 +472,7 @@ function bindActions(){
     const email=document.getElementById("staff-email").value.trim().toLowerCase();
     const password=document.getElementById("staff-password").value;
     const staffRole=document.getElementById("staff-role").value;
-    if(password.length<10){toast("Temporary password must be at least 10 characters.",true);return;}
+    if(password.length<10||!/[a-z]/.test(password)||!/[A-Z]/.test(password)||!/[0-9]/.test(password)||!/[^A-Za-z0-9]/.test(password)){toast("Use 10+ characters with uppercase, lowercase, a number and a symbol.",true);return;}
     button.disabled=true;button.textContent="Creating secure account…";
     try{
       await api("",{action:"create_staff_account",email,password,role:staffRole});
