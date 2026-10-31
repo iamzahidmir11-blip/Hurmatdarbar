@@ -1,9 +1,13 @@
 import {createClient} from "https://esm.sh/@supabase/supabase-js@2";
-const db=createClient("https://rvrboufrnkzuptfjopwd.supabase.co","sb_publishable_n1PWbHcomKpd63FPDdWSEw_iSo6UTi0");
+const SUPABASE_URL="https://rvrboufrnkzuptfjopwd.supabase.co";
+const SUPABASE_KEY="sb_publishable_n1PWbHcomKpd63FPDdWSEw_iSo6UTi0";
+const db=createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 document.getElementById("year").textContent=new Date().getFullYear();
 document.querySelector(".hamb").onclick=()=>document.querySelector(".top").classList.toggle("nav-open");
 const cats=document.getElementById("menu-categories"),grid=document.getElementById("menu-grid"),status=document.getElementById("menu-status"),panel=document.getElementById("cart-panel"),scrim=document.getElementById("cart-scrim");
-let items=[],cat="all",query="",cart=[],selectedVariants={},restaurantSettings=null,placingOrder=false;try{cart=JSON.parse(localStorage.getItem("hd-cart")||"[]");if(!Array.isArray(cart))cart=[]}catch{cart=[]}
+let items=[],cat="all",query="",cart=[],selectedVariants={},restaurantSettings=null,placingOrder=false;
+let availabilityRequestId=localStorage.getItem("hd-availability-request")||"",availabilityPayload=null,availabilityApproved=false,availabilityPolling=false,availabilityMessage="";
+try{availabilityPayload=JSON.parse(localStorage.getItem("hd-availability-payload")||"null")}catch{availabilityPayload=null}try{cart=JSON.parse(localStorage.getItem("hd-cart")||"[]");if(!Array.isArray(cart))cart=[]}catch{cart=[]}
 const money=n=>"₹"+Number(n).toLocaleString("en-IN");
 const isIndianFoodCategory = name => { const key=String(name||"").trim().toLowerCase(); return key.startsWith("indian") || ["wazwan","tandoori","naan and roti","rice"].includes(key); };
 
@@ -50,7 +54,7 @@ function render(){
   });
 }
 function addItem(item,v,open=true){const key=cartKey(item.id,v.id),old=cart.find(x=>x.key===key),limit=item.track_stock===true?Number(item.stock_qty||0):50;if(item.available===false||limit<1){alert("This product is currently unavailable.");return}if(old&&old.qty>=Math.min(50,limit)){alert("Only "+limit+" units are currently available.");return}selectedVariants[item.id]=v.id;if(old)old.qty++;else cart.push({key,item_id:item.id,variant_id:v.id,name:item.name,label:v.label,price:+v.price,qty:1});save();render();if(open)toggleCart(true)}
-function save(){localStorage.setItem("hd-cart",JSON.stringify(cart));renderCart();checkoutState()}
+function save(){if(availabilityRequestId)clearAvailability("Your bag changed. Please check delivery availability again.");localStorage.setItem("hd-cart",JSON.stringify(cart));renderCart();checkoutState()}
 function renderCart(){
   const root=document.getElementById("cart-lines");root.replaceChildren();let subtotal=0,count=0;
   cart.forEach(x=>{
@@ -86,30 +90,45 @@ function qtyChange(key,d){const x=cart.find(x=>x.key===key);if(!x)return;const i
 const paymentLabel=el("label","payment-label","Payment method");
 const paymentSelect=el("select","payment-method");
 paymentSelect.id="payment-method";paymentLabel.htmlFor=paymentSelect.id;
-const orderHelp=el("small","","Checking restaurant ordering setup…");
+const orderHelp=el("small","","Add items and delivery details, then request confirmation from the restaurant.");
 orderHelp.id="order-help";
+const paymentInfo=el("div","payment-note");
+paymentInfo.id="payment-info";
 const checkoutButton=document.getElementById("checkout");
-checkoutButton.textContent="Place order";
+checkoutButton.textContent="Check Availability";
 checkoutButton.insertAdjacentElement("beforebegin",paymentLabel);
 checkoutButton.insertAdjacentElement("beforebegin",paymentSelect);
+checkoutButton.insertAdjacentElement("beforebegin",paymentInfo);
 checkoutButton.insertAdjacentElement("afterend",orderHelp);
-function checkoutState(){
-  const fee=Number(restaurantSettings?.delivery_fee??30);
-  const feeLabel=document.getElementById("delivery-fee-label");
-  if(feeLabel)feeLabel.textContent=money(fee);
-  const methods=[];
-  if(restaurantSettings?.cod_enabled)methods.push({value:"cod",label:"Cash on delivery"});
-  if(restaurantSettings?.upi_enabled&&restaurantSettings?.upi_id)methods.push({value:"upi_manual",label:"Manual UPI (staff verifies payment)"});
-  paymentSelect.replaceChildren();
-  methods.forEach(m=>{const o=document.createElement("option");o.value=m.value;o.textContent=m.label;paymentSelect.append(o);});
-  if(!methods.length){const o=document.createElement("option");o.value="";o.textContent="No payment method enabled";paymentSelect.append(o);}
-  const stockOk=cart.every(line=>{const item=items.find(i=>i.id===line.item_id);return item&&item.available!==false&&(item.track_stock!==true||Number(item.stock_qty||0)>=Number(line.qty))});
-  const ready=cart.length>0&&stockOk&&!!restaurantSettings?.is_open&&!!restaurantSettings?.location_verified&&methods.length>0;
-  checkoutButton.disabled=!ready||placingOrder||Number(document.getElementById("cart-subtotal").textContent.replace(/[^0-9]/g,""))<Number(restaurantSettings?.min_order||0);
-  orderHelp.textContent=!stockOk?"One or more products no longer have enough stock. Update your bag quantity.":!restaurantSettings?"Restaurant setup could not be loaded.":
-    !restaurantSettings.is_open?"The restaurant is currently not accepting orders.":
-    !restaurantSettings.location_verified?"Online delivery is not enabled: restaurant map location still needs verification.":
-    !methods.length?"Online ordering is paused until the restaurant enables a payment method.":Number(document.getElementById("cart-subtotal").textContent.replace(/[^0-9]/g,""))<Number(restaurantSettings?.min_order||0)?"Minimum order is "+money(restaurantSettings.min_order)+". Add more items to continue.":"Your order will be saved directly to the restaurant order system.";
+paymentLabel.hidden=true;paymentSelect.hidden=true;paymentInfo.hidden=true;
+paymentSelect.onchange=checkoutState;
+
+function clearAvailability(message){
+  localStorage.removeItem("hd-availability-request");
+  localStorage.removeItem("hd-availability-payload");
+  availabilityRequestId="";availabilityPayload=null;availabilityApproved=false;availabilityPolling=false;
+  availabilityMessage=message||"";
+  paymentLabel.hidden=true;paymentSelect.hidden=true;paymentInfo.hidden=true;
+  if(orderHelp&&availabilityMessage)orderHelp.textContent=availabilityMessage;
+  checkoutState();
+}
+function ensureGuestSession(){
+  return db.auth.getSession().then(async ({data:{session}})=>{
+    if(session)return session;
+    const anon=await db.auth.signInAnonymously();
+    if(anon.error)throw new Error("Secure guest checkout is not enabled on the restaurant account yet. Please contact the restaurant.");
+    return anon.data.session;
+  });
+}
+async function callRestaurantApi(method,query,body){
+  const session=await ensureGuestSession();
+  const url=SUPABASE_URL+"/functions/v1/restaurant-api"+(query?"?"+query:"");
+  const response=await fetch(url,{method,headers:{
+    "Content-Type":"application/json","apikey":SUPABASE_KEY,"Authorization":"Bearer "+session.access_token
+  },body:body?JSON.stringify(body):undefined});
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(result.code||result.error||"Restaurant system could not complete this request.");
+  return result;
 }
 function getPosition(){
   return new Promise((resolve,reject)=>{
@@ -117,45 +136,155 @@ function getPosition(){
     navigator.geolocation.getCurrentPosition(p=>resolve({lat:p.coords.latitude,lng:p.coords.longitude}),()=>reject(new Error("Location permission is required to check delivery coverage.")),{enableHighAccuracy:true,timeout:15000,maximumAge:30000});
   });
 }
-checkoutButton.onclick=async()=>{
-  if(placingOrder)return;
-  if(!cart.length)return alert("Your bag is empty.");
-  if(!restaurantSettings?.is_open||!restaurantSettings?.location_verified||!paymentSelect.value){checkoutState();return;}
+function currentCartItems(){
+  return cart.map(x=>({variant_id:x.variant_id,qty:Math.max(1,Math.min(50,Number(x.qty)||1))}))
+    .sort((a,b)=>a.variant_id.localeCompare(b.variant_id));
+}
+function availabilityDetailsMatch(){
+  if(!availabilityPayload)return false;
+  const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+  return document.getElementById("customer-name").value.trim()===availabilityPayload.name
+    &&document.getElementById("customer-phone").value.trim()===availabilityPayload.phone
+    &&document.getElementById("customer-address").value.trim()===availabilityPayload.address
+    &&document.getElementById("customer-notes").value.trim()===availabilityPayload.notes
+    &&same(currentCartItems(),(availabilityPayload.items||[]).slice().sort((a,b)=>a.variant_id.localeCompare(b.variant_id)));
+}
+function updatePaymentInfo(){
+  paymentInfo.replaceChildren();
+  const method=paymentSelect.value;
+  if(method==="upi_manual"&&restaurantSettings?.upi_id){
+    paymentInfo.append(el("span","","Pay using UPI to: "+restaurantSettings.upi_id+". The payment will remain pending until the restaurant verifies it."));
+    const copy=el("button","btn ghost sm","Copy UPI ID");copy.type="button";
+    copy.onclick=async()=>{try{await navigator.clipboard.writeText(restaurantSettings.upi_id);copy.textContent="Copied ✓"}catch{window.prompt("Copy UPI ID",restaurantSettings.upi_id)}};
+    paymentInfo.append(copy);paymentInfo.hidden=false;
+  }else if(method==="cod"){
+    paymentInfo.textContent="Cash on delivery selected.";paymentInfo.hidden=false;
+  }else paymentInfo.hidden=true;
+}
+function checkoutState(){
+  const methods=[];
+  if(restaurantSettings?.cod_enabled)methods.push({value:"cod",label:"Cash on delivery"});
+  if(restaurantSettings?.upi_enabled&&restaurantSettings?.upi_id)methods.push({value:"upi_manual",label:"Manual UPI (staff verifies payment)"});
+  const previous=paymentSelect.value;
+  paymentSelect.replaceChildren();
+  methods.forEach(m=>{const o=document.createElement("option");o.value=m.value;o.textContent=m.label;paymentSelect.append(o);});
+  if(previous&&methods.some(m=>m.value===previous))paymentSelect.value=previous;
+  if(!methods.length){const o=document.createElement("option");o.value="";o.textContent="No payment method enabled";paymentSelect.append(o);}
+  const stockOk=cart.every(line=>{const item=items.find(i=>i.id===line.item_id);return item&&item.available!==false&&(item.track_stock!==true||Number(item.stock_qty||0)>=Number(line.qty))});
+  const subtotal=cart.reduce((sum,line)=>sum+Number(line.price)*Number(line.qty),0);
+  const enough=subtotal>=Number(restaurantSettings?.min_order||0);
+  const baseReady=cart.length>0&&stockOk&&!!restaurantSettings?.is_open&&methods.length>0&&enough;
+  if(availabilityApproved){
+    paymentLabel.hidden=false;paymentSelect.hidden=false;updatePaymentInfo();
+    checkoutButton.textContent=paymentSelect.value==="upi_manual"?"Pay & Place Order":"Place Order";
+    checkoutButton.disabled=!baseReady||placingOrder||!paymentSelect.value;
+    orderHelp.textContent=availabilityMessage||"Delivery approved. Choose payment and place your order.";
+  }else{
+    paymentLabel.hidden=true;paymentSelect.hidden=true;paymentInfo.hidden=true;
+    checkoutButton.textContent=availabilityRequestId?(availabilityPolling?"Waiting for Owner…":"Check approval status"):"Check Availability";
+    checkoutButton.disabled=!baseReady||placingOrder||availabilityPolling;
+    orderHelp.textContent=availabilityRequestId?"Your request has been sent to Hurmat Darbar. Waiting for the Owner to confirm delivery.":!stockOk?"One or more products no longer have enough stock. Update your bag quantity.":!restaurantSettings?"Restaurant setup could not be loaded.":!restaurantSettings.is_open?"The restaurant is currently not accepting orders.":!methods.length?"Online ordering is paused until the restaurant enables a payment method.":!enough?"Minimum order is "+money(restaurantSettings.min_order)+". Add more items to continue.":availabilityMessage||"Check delivery availability first. Payment appears only after Owner approval.";
+  }
+}
+async function submitAvailabilityRequest(){
   const name=document.getElementById("customer-name").value.trim();
   const phone=document.getElementById("customer-phone").value.trim();
   const address=document.getElementById("customer-address").value.trim();
   const notes=document.getElementById("customer-notes").value.trim();
-  if(name.length<2||address.length<8||phone.replace(/\D/g,"").length<10)return alert("Enter your name, valid mobile number and complete delivery address.");
-  placingOrder=true;checkoutButton.disabled=true;checkoutButton.textContent="Submitting order…";
+  if(name.length<2||address.length<8||phone.replace(/\\D/g,"").length<10)throw new Error("Enter your name, valid mobile number and complete delivery address.");
+  const position=await getPosition();
+  const request={name,phone,address,lat:position.lat,lng:position.lng,notes,items:currentCartItems()};
+  const result=await callRestaurantApi("POST","",{action:"request_delivery_availability",request});
+  availabilityRequestId=result.availability.request_id;
+  availabilityPayload=request;
+  localStorage.setItem("hd-availability-request",availabilityRequestId);
+  localStorage.setItem("hd-availability-payload",JSON.stringify(availabilityPayload));
+  availabilityMessage="Request sent. The Owner is checking whether delivery is possible.";
+  availabilityPolling=false;
+  checkoutState();
+  pollAvailabilityStatus();
+}
+async function pollAvailabilityStatus(){
+  if(!availabilityRequestId||availabilityPolling)return;
+  const id=availabilityRequestId;availabilityPolling=true;checkoutState();
   try{
-    const position=await getPosition();
-    let {data:{session}}=await db.auth.getSession();
-    if(!session){
-      const anon=await db.auth.signInAnonymously();
-      if(anon.error)throw new Error("Secure guest checkout is not enabled on the restaurant account yet. Please contact the restaurant.");
-      session=anon.data.session;
+    const result=await callRestaurantApi("GET","view=availability_status&request_id="+encodeURIComponent(id));
+    if(id!==availabilityRequestId)return;
+    const statusValue=result.availability?.status;
+    if(statusValue==="approved"){
+      availabilityPolling=false;availabilityApproved=true;
+      availabilityMessage="Owner approved delivery. You can now continue to payment and place the order.";
+      checkoutState();return;
     }
-    const payload={
-      name:name,phone:phone,address:address,lat:position.lat,lng:position.lng,notes:notes,
-      payment_method:paymentSelect.value,
-      idempotency_key:(crypto.randomUUID?crypto.randomUUID():"hd-"+Date.now()+"-"+Math.random().toString(36).slice(2)),
-      items:cart.map(x=>({variant_id:x.variant_id,qty:Math.max(1,Math.min(50,Number(x.qty)||1))}))
-    };
-    const response=await fetch("https://rvrboufrnkzuptfjopwd.supabase.co/functions/v1/restaurant-api",{
-      method:"POST",headers:{"Content-Type":"application/json","apikey":"sb_publishable_n1PWbHcomKpd63FPDdWSEw_iSo6UTi0","Authorization":"Bearer "+session.access_token},
-      body:JSON.stringify({action:"create_order",order:payload})
-    });
-    const result=await response.json().catch(()=>({}));
-    if(!response.ok)throw new Error(result.code||result.error||"Order could not be submitted.");
-    const order=result.order||{};
-    cart=[];save();toggleCart(false);
-    const success=document.getElementById("order-success"),token=order.tracking_token||"";document.getElementById("success-copy").textContent="Order #"+(order.order_no||"—")+" has been sent to Hurmat Darbar. Total: "+money(order.total||0)+".";document.getElementById("success-token").textContent=token||"Tracking reference unavailable";if(success)success.hidden=false;
-    document.getElementById("customer-name").value="";
-    document.getElementById("customer-phone").value="";
-    document.getElementById("customer-address").value="";
-    document.getElementById("customer-notes").value="";
-  }catch(error){alert(error.message||"Unable to submit the order.");}
-  finally{placingOrder=false;checkoutButton.textContent="Place order";checkoutState();}
+    if(statusValue==="rejected"){
+      const reason=result.availability?.decision_reason||"Hurmat Darbar cannot deliver to this address right now.";
+      clearAvailability("Not available: "+reason);return;
+    }
+    if(statusValue==="expired"){
+      clearAvailability("This availability request expired. Please check again.");return;
+    }
+    availabilityPolling=false;
+    availabilityMessage="Request sent. Waiting for Owner approval…";
+    checkoutState();
+    setTimeout(()=>{if(id===availabilityRequestId)pollAvailabilityStatus()},5000);
+  }catch(error){
+    availabilityPolling=false;availabilityMessage="Waiting for Owner response. Connection will retry automatically.";
+    checkoutState();
+    setTimeout(()=>{if(id===availabilityRequestId)pollAvailabilityStatus()},7000);
+  }
+}
+function resumeAvailability(){
+  if(!availabilityRequestId||!availabilityPayload)return;
+  document.getElementById("customer-name").value=availabilityPayload.name||"";
+  document.getElementById("customer-phone").value=availabilityPayload.phone||"";
+  document.getElementById("customer-address").value=availabilityPayload.address||"";
+  document.getElementById("customer-notes").value=availabilityPayload.notes||"";
+  availabilityMessage="Restoring your delivery availability request…";
+  pollAvailabilityStatus();
+}
+async function placeApprovedOrder(){
+  if(!availabilityApproved||!availabilityRequestId||!availabilityPayload)throw new Error("Owner approval is required before placing an order.");
+  if(!availabilityDetailsMatch()){
+    clearAvailability("Your delivery details or bag changed. Please check availability again.");
+    throw new Error("Your delivery details or bag changed. Please check availability again.");
+  }
+  const idempotencyKey=availabilityPayload.idempotency_key||(crypto.randomUUID?crypto.randomUUID():"hd-"+Date.now()+"-"+Math.random().toString(36).slice(2));
+  availabilityPayload.idempotency_key=idempotencyKey;
+  localStorage.setItem("hd-availability-payload",JSON.stringify(availabilityPayload));
+  const order={...availabilityPayload,payment_method:paymentSelect.value,idempotency_key:idempotencyKey,availability_request_id:availabilityRequestId};
+  const result=await callRestaurantApi("POST","",{action:"create_order",order});
+  const savedOrder=result.order||{};
+  cart=[];localStorage.setItem("hd-cart","[]");
+  localStorage.removeItem("hd-availability-request");localStorage.removeItem("hd-availability-payload");
+  availabilityRequestId="";availabilityPayload=null;availabilityApproved=false;availabilityPolling=false;
+  renderCart();toggleCart(false);
+  const success=document.getElementById("order-success"),token=savedOrder.tracking_token||"";
+  document.getElementById("success-copy").textContent="Order #"+(savedOrder.order_no||"—")+" has been sent to Hurmat Darbar. Payment status: pending restaurant verification. Total: "+money(savedOrder.total||0)+".";
+  document.getElementById("success-token").textContent=token||"Tracking reference unavailable";
+  if(success)success.hidden=false;
+  document.getElementById("customer-name").value="";
+  document.getElementById("customer-phone").value="";
+  document.getElementById("customer-address").value="";
+  document.getElementById("customer-notes").value="";
+  availabilityMessage="";
+  checkoutState();
+}
+checkoutButton.onclick=async()=>{
+  if(placingOrder)return;
+  placingOrder=true;checkoutButton.disabled=true;
+  try{
+    if(availabilityApproved){
+      checkoutButton.textContent="Placing order…";
+      await placeApprovedOrder();
+    }else if(availabilityRequestId){
+      checkoutButton.textContent="Checking…";
+      await pollAvailabilityStatus();
+    }else{
+      checkoutButton.textContent="Checking availability…";
+      await submitAvailabilityRequest();
+    }
+  }catch(error){alert(error.message||"Unable to continue checkout.");}
+  finally{placingOrder=false;checkoutState();}
 };
 async function load(){
   status.textContent="Loading live menu and restaurant settings…";
@@ -175,7 +304,7 @@ async function load(){
   renderCats(a.data||[]);
   status.textContent=items.length+" menu items loaded · live restaurant prices";
   const search=el("input","menu-search");search.placeholder="Search dishes, drinks and more…";search.oninput=()=>{query=search.value.toLowerCase().trim();render();};
-  const tools=el("div","menu-tools");tools.append(search);cats.after(tools);render();renderCart();checkoutState();
+  const tools=el("div","menu-tools");tools.append(search);cats.after(tools);render();renderCart();checkoutState();resumeAvailability();
 }
 renderCart();load();if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}))}
 const reservationForm=document.getElementById("reservation-form");
