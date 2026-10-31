@@ -72,6 +72,14 @@ Deno.serve(async (req: Request) => {
           .eq("customer_id", user.id).in("order_id", ids).order("created_at", { ascending: false }) : { data: [] };
         return reply({ orders: data ?? [], payments: proofs ?? [] });
       }
+      if (view === "refunds") {
+        if (![...roles].some((r) => ["owner", "manager"].includes(r))) return reply({ error: "forbidden" }, 403);
+        const { data, error } = await supabase.from("refund_requests")
+          .select("id,order_id,customer_id,amount,reason,status,refund_method,refund_reference,owner_note,requested_at,processed_at,orders(order_no,customer_name,customer_phone,total,payment_method,payment_status,status)")
+          .order("requested_at", { ascending: false }).limit(100);
+        if (error) return reply({ error: "refunds_unavailable" }, 500);
+        return reply({ refunds: data ?? [] });
+      }
       if (view === "payments") {
         if (![...roles].some((r) => ["owner", "manager"].includes(r))) return reply({ error: "forbidden" }, 403);
         const { data, error } = await supabase.from("payment_submissions")
@@ -143,6 +151,21 @@ Deno.serve(async (req: Request) => {
         if (error) return reply({ error: error.message || "payment_proof_failed" }, 400);
         return reply({ payment: data }, 201);
       }
+      case "update_refund": {
+        if (![...roles].some((r) => ["owner", "manager"].includes(r))) return reply({ error: "forbidden" }, 403);
+        if (!isUuid(body.refund_id) || !["approved", "processing", "completed", "rejected"].includes(body.status)) {
+          return reply({ error: "invalid_refund_update" }, 400);
+        }
+        const { data, error } = await supabase.rpc("set_refund_status", {
+          p_refund_id: body.refund_id,
+          p_status: body.status,
+          p_reference: typeof body.reference === "string" ? body.reference.slice(0, 100) : null,
+          p_note: typeof body.note === "string" ? body.note.slice(0, 300) : null,
+        });
+        if (error) return reply({ error: error.message || "refund_update_failed" }, 400);
+        return reply({ refund: data });
+      }
+
       case "review_upi_payment": {
         if (![...roles].some((r) => ["owner", "manager"].includes(r))) return reply({ error: "forbidden" }, 403);
         if (!isUuid(body.submission_id) || !["approved", "rejected"].includes(body.decision)) return reply({ error: "invalid_payment_review" }, 400);
