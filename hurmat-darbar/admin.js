@@ -18,7 +18,7 @@ const statusNames = {
 const tabs = [["home","⌂","Overview"],["orders","▤","Orders"],["menu","▦","Menu"],["inventory","▣","Inventory"],["reservations","◷","Bookings"],["riders","♧","Riders"],["reports","▥","Reports"],["settings","⚙","Store setup"],["alerts","♢","Alerts"]];
 // Temporary development-only UI preview. Live data and all write operations remain protected.
 const DEVELOPMENT_PREVIEW = false;
-let user=null, role=null, page="home", orders=[], menuItems=[], menuCategories=[], reservations=[], riders=[], notifications=[], availabilityRequests=[], settings=null, channel=null, busy=false;
+let user=null, role=null, page="home", orders=[], menuItems=[], menuCategories=[], reservations=[], riders=[], notifications=[], availabilityRequests=[], settings=null, channel=null, busy=false, availabilityRefreshTimer=null;
 
 function toast(message, bad=false){
   let el=document.getElementById("admin-toast");
@@ -486,6 +486,16 @@ function bindActions(){
 async function startApp(){
   await refresh();
   if(DEVELOPMENT_PREVIEW) return;
+  if(availabilityRefreshTimer)clearInterval(availabilityRefreshTimer);
+  availabilityRefreshTimer=setInterval(async()=>{
+    if(role!=="owner"||document.hidden)return;
+    try{
+      const result=await api("availability");
+      const next=result.requests||[];
+      const changed=JSON.stringify(next)!==JSON.stringify(availabilityRequests);
+      if(changed){availabilityRequests=next;render();}
+    }catch(error){console.warn("Availability request refresh failed:",error);}
+  },8000);
   if(channel)await supabase.removeChannel(channel);
   channel=supabase.channel("hurmat-admin-live")
     .on("postgres_changes",{event:"*",schema:"public",table:"orders"},()=>refresh())
