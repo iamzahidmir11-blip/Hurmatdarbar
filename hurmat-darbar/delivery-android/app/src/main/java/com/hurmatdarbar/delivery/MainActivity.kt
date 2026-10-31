@@ -6,9 +6,6 @@ import android.content.Intent
 import android.net.Uri
 import android.Manifest
 import android.content.pm.PackageManager
-import android.location.Location
-import android.location.LocationListener
-import android.location.LocationManager
 import android.widget.*
 import org.json.JSONObject
 import org.json.JSONArray
@@ -25,8 +22,6 @@ class MainActivity : Activity() {
  private var online=false
  private var orderFilter="active"
  private var sharingOrderId:String?=null
- private var locationManager:LocationManager?=null
- private var locationListener:LocationListener?=null
  private lateinit var root:LinearLayout
  private lateinit var status:TextView
  private val ink=Color.rgb(33,31,24); private val gold=Color.rgb(181,138,75); private val paper=Color.rgb(245,241,232)
@@ -64,7 +59,7 @@ class MainActivity : Activity() {
   root.addView(button("Delivery history"){orderFilter="history";orders()})
   root.addView(button("All assigned orders"){orderFilter="all";orders()})
   root.addView(button("Refresh"){orders()})
-  root.addView(button("Sign Out"){token=null;online=false;login()})
+  root.addView(button("Sign Out"){stopLocationSharing();token=null;online=false;login()})
   status.text="Loading assigned orders…"
   worker.execute { try {
    val rows=request(base+"/functions/v1/restaurant-api","GET",null,token).optJSONArray("orders")?:JSONArray()
@@ -116,47 +111,36 @@ class MainActivity : Activity() {
  private fun startLocationSharing(orderId:String) {
   if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED &&
      checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)!=PackageManager.PERMISSION_GRANTED) {
-   requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION),7101)
    sharingOrderId=orderId
-   status.text="Allow location permission, then tap Share live location again."
+   requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION),7101)
+   status.text="Allow location permission to start background sharing."
    return
   }
+  val accessToken=token
+  if(accessToken.isNullOrBlank()){status.text="Sign in again before sharing location.";return}
   try {
-   val manager=getSystemService(LOCATION_SERVICE) as LocationManager
-   val provider=if(manager.isProviderEnabled(LocationManager.GPS_PROVIDER)) LocationManager.GPS_PROVIDER else LocationManager.NETWORK_PROVIDER
-   val listener=LocationListener { location -> sendLocation(orderId,location) }
-   manager.requestLocationUpdates(provider,10000L,10f,listener)
-   locationManager=manager; locationListener=listener; sharingOrderId=orderId
-   status.text="Live location sharing is active while this screen is open."
+   val intent=Intent(this,RiderLocationService::class.java)
+    .putExtra(RiderLocationService.EXTRA_ORDER_ID,orderId)
+    .putExtra(RiderLocationService.EXTRA_ACCESS_TOKEN,accessToken)
+   if(android.os.Build.VERSION.SDK_INT>=26)startForegroundService(intent) else startService(intent)
+   sharingOrderId=orderId
+   status.text="Live location is sharing in the background for this delivery."
    orders()
-  } catch(ex:SecurityException) { status.text="Location permission is required." }
-    catch(ex:Exception) { status.text="Unable to start location: "+(ex.message?: "check device location settings") }
- }
- private fun sendLocation(orderId:String,location:Location) {
-  val payload=JSONObject().put("action","post_location").put("order_id",orderId)
-   .put("lat",location.latitude).put("lng",location.longitude).put("accuracy",location.accuracy.toDouble())
-  worker.execute { try { request(base+"/functions/v1/restaurant-api","POST",payload.toString(),token) }
-   catch(ex:Exception) { runOnUiThread { status.text="Location update failed: "+message(ex) } } }
+  } catch(ex:Exception) { status.text="Unable to start live location: "+(ex.message?: "try again") }
  }
  private fun stopLocationSharing() {
-  try { if(locationListener!=null) locationManager?.removeUpdates(locationListener!!) } catch(_:Exception) {}
-  locationListener=null; locationManager=null; sharingOrderId=null
+  stopService(Intent(this,RiderLocationService::class.java))
+  sharingOrderId=null
   status.text="Location sharing stopped."
-  orders()
- }
- override fun onPause() { stopLocationUpdatesOnly(); super.onPause() }
- private fun stopLocationUpdatesOnly() {
-  try { if(locationListener!=null) locationManager?.removeUpdates(locationListener!!) } catch(_:Exception) {}
-  locationListener=null; locationManager=null; sharingOrderId=null
  }
  override fun onRequestPermissionsResult(requestCode:Int,permissions:Array<out String>,grantResults:IntArray) {
   super.onRequestPermissionsResult(requestCode,permissions,grantResults)
   if(requestCode==7101) {
-   if(grantResults.any { it==PackageManager.PERMISSION_GRANTED }) status.text="Permission granted. Tap Share live location again."
+   val orderId=sharingOrderId
+   if(grantResults.any { it==PackageManager.PERMISSION_GRANTED } && orderId!=null) startLocationSharing(orderId)
    else { sharingOrderId=null; status.text="Location permission denied; sharing is off." }
   }
  }
-
  private fun availability(value:Boolean){
   status.text="Updating availability…"
   worker.execute{try{request(base+"/functions/v1/restaurant-api","POST",JSONObject().put("action","set_rider_availability").put("is_online",value).toString(),token);online=value;runOnUiThread{orders()}}
@@ -165,7 +149,7 @@ class MainActivity : Activity() {
  private fun update(id:String,next:String,reason:String?){
   status.text="Updating order…"
   worker.execute{try{val b=JSONObject().put("action","update_order_status").put("order_id",id).put("status",next);if(reason!=null)b.put("reason",reason)
-   request(base+"/functions/v1/restaurant-api","POST",b.toString(),token);runOnUiThread{orders()}}
+   request(base+"/functions/v1/restaurant-api","POST",b.toString(),token);if(next=="delivery_failed"||next=="delivered")stopLocationSharing();runOnUiThread{orders()}}
    catch(ex:Exception){runOnUiThread{status.text=message(ex)}}}
  }
  private fun request(url:String,method:String,body:String?,bearer:String?):JSONObject{
@@ -185,5 +169,5 @@ class MainActivity : Activity() {
   m.contains("riders")||m.contains("availability")->"Rider profile missing or unavailable. Ask owner to register this rider."
   else->m.take(180)
  }}
- override fun onDestroy(){stopLocationUpdatesOnly();worker.shutdownNow();super.onDestroy()}
+ override fun onDestroy(){worker.shutdownNow();super.onDestroy()}
 }
