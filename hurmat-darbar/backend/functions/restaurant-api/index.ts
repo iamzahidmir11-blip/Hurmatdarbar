@@ -61,6 +61,29 @@ Deno.serve(async (req: Request) => {
     if (req.method === "GET") {
       const view = new URL(req.url).searchParams.get("view") ?? "orders";
       const requestId = new URL(req.url).searchParams.get("request_id");
+      if (view === "my_orders") {
+        const { data, error } = await supabase.from("orders")
+          .select("id, order_no, tracking_token, customer_name, customer_phone, address_text, payment_method, payment_status, status, subtotal, delivery_fee, total, created_at, updated_at, order_items(id,item_name,variant_label,unit_price,qty,line_total)")
+          .eq("customer_id", user.id).order("created_at", { ascending: false }).limit(30);
+        if (error) return reply({ error: "my_orders_unavailable" }, 500);
+        const ids = (data ?? []).map((o: { id: string }) => o.id);
+        const { data: proofs } = ids.length ? await supabase.from("payment_submissions")
+          .select("id,order_id,upi_reference,status,review_note,created_at")
+          .eq("customer_id", user.id).in("order_id", ids).order("created_at", { ascending: false }) : { data: [] };
+        return reply({ orders: data ?? [], payments: proofs ?? [] });
+      }
+      if (view === "payments") {
+        if (![...roles].some((r) => ["owner", "manager"].includes(r))) return reply({ error: "forbidden" }, 403);
+        const { data, error } = await supabase.from("payment_submissions")
+          .select("id,order_id,customer_id,upi_reference,screenshot_path,status,review_note,created_at,orders(order_no,customer_name,customer_phone,total,status,created_at)")
+          .order("created_at", { ascending: false }).limit(100);
+        if (error) return reply({ error: "payments_unavailable" }, 500);
+        const payments = await Promise.all((data ?? []).map(async (item: Record<string, any>) => {
+          const { data: signed } = await supabase.storage.from("payment-proofs").createSignedUrl(item.screenshot_path, 300);
+          return { ...item, screenshot_url: signed?.signedUrl ?? null };
+        }));
+        return reply({ payments });
+      }
       if (view === "availability_status") {
         if (!isUuid(requestId)) return reply({ error: "invalid_request_id" }, 400);
         const { data, error } = await supabase.rpc("get_delivery_availability_status", { p_request_id: requestId });
@@ -111,6 +134,25 @@ Deno.serve(async (req: Request) => {
     }
 
     switch (body.action) {
+
+      case "submit_upi_payment_proof": {
+        if (!isUuid(body.order_id) || typeof body.reference !== "string" || typeof body.screenshot_path !== "string") return reply({ error: "invalid_payment_proof" }, 400);
+        const { data, error } = await supabase.rpc("submit_upi_payment_proof", {
+          p_order_id: body.order_id, p_reference: body.reference, p_screenshot_path: body.screenshot_path,
+        });
+        if (error) return reply({ error: error.message || "payment_proof_failed" }, 400);
+        return reply({ payment: data }, 201);
+      }
+      case "review_upi_payment": {
+        if (![...roles].some((r) => ["owner", "manager"].includes(r))) return reply({ error: "forbidden" }, 403);
+        if (!isUuid(body.submission_id) || !["approved", "rejected"].includes(body.decision)) return reply({ error: "invalid_payment_review" }, 400);
+        const { data, error } = await supabase.rpc("review_upi_payment", {
+          p_submission_id: body.submission_id, p_decision: body.decision,
+          p_note: typeof body.note === "string" ? body.note.slice(0, 300) : null,
+        });
+        if (error) return reply({ error: error.message || "payment_review_failed" }, 400);
+        return reply({ payment: data });
+      }
 
       case "request_delivery_availability": {
         const { data, error } = await supabase.rpc("request_delivery_availability", { p: body.request });
