@@ -15,7 +15,7 @@ const statusNames = {
   ready_for_pickup:"Ready for pickup", picked_up:"Picked up", out_for_delivery:"Out for delivery",
   delivered:"Delivered", cancelled:"Cancelled", rejected:"Rejected", delivery_failed:"Delivery failed"
 };
-const tabs = [["home","⌂","Overview"],["orders","▤","Orders"],["menu","▦","Menu"],["inventory","▣","Inventory"],["availability","✓","Delivery checks"],["payments","₹","Payments"],["reservations","◷","Bookings"],["riders","♧","Riders"],["reports","▥","Reports"],["settings","⚙","Store setup"],["alerts","♢","Alerts"]];
+const tabs = [["home","⌂","Overview"],["orders","▤","Orders"],["menu","▦","Menu"],["inventory","▣","Inventory"],["availability","✓","Delivery checks"],["payments","₹","Payments"],["refunds","↩","Refunds"],["reservations","◷","Bookings"],["riders","♧","Riders"],["reports","▥","Reports"],["settings","⚙","Store setup"],["alerts","♢","Alerts"]];
 // Temporary development-only UI preview. Live data and all write operations remain protected.
 const DEVELOPMENT_PREVIEW = false;
 let user=null, role=null, page="home", orders=[], menuItems=[], menuCategories=[], reservations=[], riders=[], notifications=[], availabilityRequests=[], availabilityLoadError="", payments=[], settings=null, channel=null, busy=false, availabilityRefreshTimer=null;
@@ -217,6 +217,17 @@ function paymentsView(){
     (p.status==="pending"?'<div class="actions"><button class="btn sm" data-payment-review="'+esc(p.id)+'" data-decision="approved">Verify & confirm order</button><button class="btn ghost sm" data-payment-review="'+esc(p.id)+'" data-decision="rejected">Reject proof</button></div>':'<p class="mute">Review note: '+esc(p.review_note||"—")+'</p>')+
     '</article>').join("")||empty("No UPI payment submissions yet."))+'</section>';
 }
+function refundsView(){
+  const active=refunds.filter(r=>["pending_review","approved","processing"].includes(r.status));
+  return '<section class="partner-panel"><div class="panel-heading"><div><h2>Customer refunds</h2><p>Only mark a refund completed after the money has actually been returned. Enter the real UPI/bank reference.</p></div><span class="pill">'+active.length+' active</span></div>'+
+    (refunds.map(r=>'<article class="card" style="margin:12px 0"><div class="row"><b>Order #'+esc(r.orders?.order_no||"—")+' · '+esc(r.orders?.customer_name||"Customer")+'</b><span class="tag '+(r.status==="completed"?"s-served":r.status==="rejected"?"s-cancelled":"s-new")+'">'+esc(r.status.replaceAll("_"," "))+'</span></div>'+
+    '<p class="mute">'+esc(r.orders?.customer_phone||"")+' · '+new Date(r.requested_at).toLocaleString()+'</p><p><b>Refund amount: '+money(r.amount)+'</b></p><p class="mute">Reason: '+esc(r.reason)+'</p>'+
+    (r.refund_reference?'<p class="mute">Refund reference: '+esc(r.refund_reference)+'</p>':'')+(r.owner_note?'<p class="mute">Note: '+esc(r.owner_note)+'</p>':'')+
+    (r.status==="pending_review"?'<div class="actions"><button class="btn sm" data-refund="'+esc(r.id)+'" data-refund-status="approved">Approve refund</button><button class="btn ghost sm" data-refund="'+esc(r.id)+'" data-refund-status="rejected">Reject</button></div>':'')+
+    (r.status==="approved"?'<div class="actions"><button class="btn sm" data-refund="'+esc(r.id)+'" data-refund-status="processing">Mark processing</button></div>':'')+
+    (r.status==="processing"?'<div class="actions"><button class="btn sm" data-refund="'+esc(r.id)+'" data-refund-status="completed">Mark refunded</button></div>':'')+
+    '</article>').join("")||empty("No refund requests yet."))+'</section>';
+}
 function alertsView(){
   return notifications.map(n=>'<div class="item-row"><div class="item-meta"><b>'+esc(n.title)+'</b><span class="mute">'+esc(n.body||"")+'</span><span class="mute">'+new Date(n.created_at).toLocaleString()+'</span></div>'+(n.is_read?"":'<button class="btn ghost sm" data-read="'+esc(n.id)+'">Mark read</button>')+'</div>').join("")||empty("No notifications yet.");
 }
@@ -246,9 +257,9 @@ function settingsView(){
 }
 function render(){
   nav();
-  const titles={home:["Overview","Live restaurant operations and business pulse."],orders:["Order desk","Manage incoming orders through kitchen and delivery stages."],availability:["Delivery checks","Review every customer delivery request and respond YES or NO."],payments:["Payments","Verify UPI references and customer payment screenshots."],menu:["Menu management","Control dishes, categories, prices, photos and availability."],inventory:["Inventory","Physical stock counts synced with customer ordering."],reservations:["Bookings","Customer reservation requests."],riders:["Delivery team","Rider accounts and availability."],reports:["Reports","Sales trends and top-selling menu items."],settings:["Store setup","Restaurant profile, operating status, delivery and payment configuration."],alerts:["Notifications","Live operational alerts and order updates."]};
+  const titles={home:["Overview","Live restaurant operations and business pulse."],orders:["Order desk","Manage incoming orders through kitchen and delivery stages."],availability:["Delivery checks","Review every customer delivery request and respond YES or NO."],payments:["Payments","Verify UPI references and customer payment screenshots."],refunds:["Refunds","Review cancellations and record verified customer refunds."],menu:["Menu management","Control dishes, categories, prices, photos and availability."],inventory:["Inventory","Physical stock counts synced with customer ordering."],reservations:["Bookings","Customer reservation requests."],riders:["Delivery team","Rider accounts and availability."],reports:["Reports","Sales trends and top-selling menu items."],settings:["Store setup","Restaurant profile, operating status, delivery and payment configuration."],alerts:["Notifications","Live operational alerts and order updates."]};
   const t=titles[page]||titles.home;
-  let content=page==="home"?homeView():page==="orders"?ordersView():page==="availability"?availabilityRequestsView():page==="payments"?paymentsView():page==="menu"?menuView():page==="inventory"?inventoryView():page==="reservations"?reservationsView():page==="riders"?ridersView():page==="reports"?reportsView():page==="settings"?settingsView():alertsView();
+  let content=page==="home"?homeView():page==="orders"?ordersView():page==="availability"?availabilityRequestsView():page==="payments"?paymentsView():page==="refunds"?refundsView():page==="menu"?menuView():page==="inventory"?inventoryView():page==="reservations"?reservationsView():page==="riders"?ridersView():page==="reports"?reportsView():page==="settings"?settingsView():alertsView();
   shell(t[0],t[1],content);
   bindActions();
 }
@@ -262,7 +273,7 @@ async function refresh(){
     supabase.from("notifications").select("id,title,body,order_id,is_read,created_at").order("created_at",{ascending:false}).limit(60),
     supabase.from("restaurant_settings").select("*").eq("id",1).single(),
     role==="owner"?api("availability"):Promise.resolve({requests:[]}),
-    (role==="owner"||role==="manager")?api("payments"):Promise.resolve({payments:[]})]);
+    (role==="owner"||role==="manager")?api("payments"):Promise.resolve({payments:[]}),(role==="owner"||role==="manager")?api("refunds"):Promise.resolve({refunds:[]})]);
   if(results[0].status==="fulfilled")orders=results[0].value.orders||[];
   if(results[1].status==="fulfilled")menuItems=results[1].value.items||[];
   if(results[2].status==="fulfilled")reservations=results[2].value.reservations||[];
@@ -271,7 +282,7 @@ async function refresh(){
   if(results[5].status==="fulfilled"&&!results[5].value.error)settings=results[5].value.data;
   if(results[6].status==="fulfilled"){availabilityRequests=results[6].value.requests||[];availabilityLoadError="";}
   else{availabilityLoadError=results[6].reason?.message||"Owner availability API is unavailable.";}
-  if(results[7].status==="fulfilled")payments=results[7].value.payments||[];
+  if(results[7].status==="fulfilled")payments=results[7].value.payments||[];\n  if(results[8].status==="fulfilled")refunds=results[8].value.refunds||[];
   const categoryResult=await supabase.from("menu_categories").select("id,name,active,sort_order").order("sort_order");if(!categoryResult.error)menuCategories=categoryResult.data||[];
   render();
 }
@@ -329,6 +340,16 @@ function bindActions(){
       await refresh();
       toast(decision==="approved"?"Delivery approved. Customer can now pay and place the order.":"Delivery request rejected.");
     }catch(e){toast(e.message||"Availability decision failed.",true);b.disabled=false;}
+  });
+  document.querySelectorAll("[data-refund]").forEach(b=>b.onclick=async()=>{
+    const status=b.dataset.refundStatus;
+    const reference=status==="completed"?prompt("Enter the actual UPI/bank refund reference (UTR):"):null;
+    if(status==="completed"&&(!reference||reference.trim().length<6)){toast("A valid refund reference is required.",true);return;}
+    const note=status==="rejected"?(prompt("Reason for rejecting this refund request:")||"Refund request not approved"):null;
+    if(!confirm("Update refund status to "+status.replaceAll("_"," ")+"?"))return;
+    b.disabled=true;
+    try{await api("",{action:"update_refund",refund_id:b.dataset.refund,status,reference,note});await refresh();toast(status==="completed"?"Refund marked completed.":"Refund status updated.");}
+    catch(e){toast(e.message||"Refund update failed.",true);b.disabled=false;}
   });
   document.querySelectorAll("[data-payment-review]").forEach(b=>b.onclick=async()=>{
     const decision=b.dataset.decision;
@@ -527,7 +548,7 @@ async function startApp(){
       }
       if(role==="owner"||role==="manager"){
         const result=await api("payments"),next=result.payments||[];
-        if(JSON.stringify(next)!==JSON.stringify(payments)){payments=next;changed=true;}
+        if(JSON.stringify(next)!==JSON.stringify(payments)){payments=next;changed=true;}\n        const refundResult=await api("refunds"),nextRefunds=refundResult.refunds||[];\n        if(JSON.stringify(nextRefunds)!==JSON.stringify(refunds)){refunds=nextRefunds;changed=true;}
       }
       if(changed)render();
     }catch(error){console.warn("Live dashboard refresh failed:",error);}
@@ -535,7 +556,7 @@ async function startApp(){
   if(channel)await supabase.removeChannel(channel);
   channel=supabase.channel("hurmat-admin-live")
     .on("postgres_changes",{event:"*",schema:"public",table:"orders"},()=>refresh())
-    .on("postgres_changes",{event:"*",schema:"public",table:"payment_submissions"},()=>refresh())
+    .on("postgres_changes",{event:"*",schema:"public",table:"payment_submissions"},()=>refresh())\n    .on("postgres_changes",{event:"*",schema:"public",table:"refund_requests"},()=>refresh())
     .on("postgres_changes",{event:"INSERT",schema:"public",table:"notifications"},()=>{refresh();toast("New restaurant notification.");})
     .on("postgres_changes",{event:"*",schema:"public",table:"menu_items"},()=>refresh())
     .on("postgres_changes",{event:"*",schema:"public",table:"menu_variants"},()=>refresh())
