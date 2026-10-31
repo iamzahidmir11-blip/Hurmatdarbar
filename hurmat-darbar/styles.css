@@ -1118,3 +1118,24 @@ footer .logo .brand-logo{
     flex-basis:38px;
   }
 }
+
+/* UPI proof and customer order tracking */
+.payment-proof-fields{display:grid;gap:7px;margin:12px 0;padding:13px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.payment-proof-fields[hidden]{display:none!important}
+.payment-proof-fields label{font-size:11px;font-weight:800;color:var(--ink)}
+.payment-proof-fields input{width:100%;padding:11px;border:1px solid var(--line);border-radius:6px;font:12px Manrope,sans-serif}
+.my-orders-section{background:#f8f6ef;padding:75px 10vw}
+.my-orders-list{display:grid;gap:14px;margin-top:25px}
+.my-order-card{background:#fff;border:1px solid var(--line);border-radius:13px;padding:18px;box-shadow:0 8px 24px #211f1808}
+.my-order-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.my-order-head b{font:600 19px 'DM Serif Display',serif}
+.my-order-status{display:inline-flex;padding:7px 10px;border-radius:30px;background:#edf3e9;color:#285638;font-size:10px;font-weight:800}
+.my-order-meta{font-size:11px;color:var(--muted);line-height:1.7}
+.my-order-line{font-size:12px;margin:5px 0}
+.my-order-timeline{display:grid;gap:6px;border-left:2px solid var(--gold);padding:8px 0 8px 13px;margin:12px 0}
+.my-order-timeline small{font-size:10px;color:var(--muted);text-transform:capitalize}
+.my-order-map{display:inline-block;color:#315e42;font-size:11px;font-weight:800;text-decoration:underline;margin:5px 0}
+.my-order-proof-form{display:grid;gap:9px;padding:13px;background:#f6f2e9;border-radius:9px;margin:12px 0}
+.my-order-proof-form input{padding:11px;border:1px solid var(--line);background:#fff;border-radius:6px;font:12px Manrope}
+.my-orders-empty{font-size:13px;color:var(--muted);padding:16px 0}
+@media(max-width:760px){.my-orders-section{padding:60px 7vw}.my-order-card{padding:15px}.my-order-head{align-items:flex-start;flex-direction:column}.payment-proof-fields{padding:11px}}
