@@ -520,6 +520,80 @@ button{transition:filter .18s ease,transform .18s ease}
 button:focus-visible{outline:3px solid rgba(113,185,115,.55)!important;outline-offset:3px!important}
 @media(max-width:760px){.partner-topbar{padding:0 15px!important;height:68px!important}.header-icon{width:44px!important;height:44px!important;border-radius:15px!important}.owner-header-actions{gap:9px!important}#nav{height:80px!important;border-radius:28px!important;padding:8px 10px!important}#nav .dock-item .dock-icon{width:39px;height:39px;border-radius:14px}#nav .dock-item .dock-icon svg{width:22px;height:22px}}
 
+
+/* Premium Owner sign-in experience — login-only, dashboard remains unchanged */
+body:has(.auth-card){
+  min-height:100vh!important;
+  display:grid!important;
+  place-items:center!important;
+  padding:34px 18px!important;
+  background:
+    radial-gradient(ellipse at 15% 12%,rgba(183,145,83,.18),transparent 36%),
+    radial-gradient(ellipse at 88% 85%,rgba(32,59,48,.12),transparent 34%),
+    linear-gradient(135deg,#f8f6f0 0%,#eef1e9 52%,#f7f1e7 100%)!important;
+}
+body:has(.auth-card) #app.wrap{width:100%;max-width:100%;min-height:0;margin:0!important;padding:0!important}
+body:has(.auth-card) .auth-card{
+  position:relative;isolation:isolate;overflow:hidden;
+  width:min(100%,470px);max-width:470px;margin:0 auto!important;
+  padding:clamp(26px,5vw,42px)!important;
+  border:1px solid rgba(255,255,255,.9)!important;border-radius:26px!important;
+  background:rgba(255,255,255,.78)!important;
+  box-shadow:0 26px 80px rgba(32,59,48,.13),0 4px 14px rgba(32,59,48,.05)!important;
+  backdrop-filter:blur(24px) saturate(150%)!important;-webkit-backdrop-filter:blur(24px) saturate(150%)!important;
+}
+body:has(.auth-card) .auth-card:before{
+  content:"";position:absolute;z-index:-1;top:-115px;right:-105px;width:260px;height:260px;
+  border-radius:50%;background:radial-gradient(circle,rgba(190,155,98,.2),rgba(190,155,98,0) 70%);
+}
+body:has(.auth-card) .auth-card:after{
+  content:"";display:block;width:46px;height:3px;border-radius:8px;
+  background:linear-gradient(90deg,#a77a38,#d9c49c);margin:20px 0 0;
+}
+.auth-card .logo{
+  width:66px;height:66px;margin:0 auto 20px!important;padding:7px!important;
+  border:1px solid #eee7db!important;border-radius:19px!important;
+  background:#fff!important;box-shadow:0 8px 24px rgba(32,59,48,.09)!important;
+}
+.auth-card .logo img{object-fit:contain!important;border-radius:12px!important}
+.auth-card h1{
+  text-align:center;font:700 clamp(29px,5vw,35px)/1.15 "Playfair Display",Georgia,serif!important;
+  letter-spacing:-.025em;color:#203b30!important;margin:0 0 10px!important;
+}
+.auth-card>p{text-align:center;max-width:350px;margin:0 auto 25px!important;color:#78847c!important;font-size:12px!important;line-height:1.75!important}
+.auth-card form{text-align:left}
+.auth-card label{display:block;margin:13px 0 6px!important;color:#526258!important;font-size:11px!important;font-weight:800!important;letter-spacing:.035em}
+.auth-card input{
+  width:100%;min-height:49px;padding:13px 15px!important;margin:0 0 5px!important;
+  border:1px solid #e3e5dc!important;border-radius:12px!important;background:rgba(255,255,255,.88)!important;
+  color:#26352e!important;font:500 13px Manrope,Arial,sans-serif!important;
+  transition:border-color .2s,box-shadow .2s,background .2s;
+}
+.auth-card input::placeholder{color:#a2aaa2}
+.auth-card input:focus{border-color:#b68b4a!important;box-shadow:0 0 0 4px rgba(182,139,74,.13)!important;background:#fff!important}
+.auth-card .btn.wide{
+  min-height:50px;margin-top:14px!important;border:0!important;border-radius:12px!important;
+  background:linear-gradient(105deg,#203b30,#315a43)!important;color:#fff!important;
+  box-shadow:0 9px 22px rgba(32,59,48,.18)!important;font-size:12px!important;font-weight:800!important;
+  letter-spacing:.015em;transition:transform .2s,box-shadow .2s,filter .2s;
+}
+.auth-card .btn.wide:hover{transform:translateY(-1px);box-shadow:0 12px 26px rgba(32,59,48,.22)!important;filter:brightness(1.06)}
+.auth-card .btn:disabled{opacity:.65!important;transform:none}
+.auth-card details{
+  padding:13px 14px;border:1px solid #e9e5da;border-radius:13px;
+  background:rgba(249,248,243,.72);text-align:left!important;
+}
+.auth-card details summary{color:#536459;font-size:11px!important;letter-spacing:.01em}
+.auth-card details p{margin:10px 0 12px!important;text-align:left!important;font-size:11px!important}
+.auth-card .text-action{display:block;width:100%;text-align:center;color:#8a6a37!important;font-size:11px!important}
+.auth-card .notice{border-radius:12px!important}
+@media(max-width:520px){
+ body:has(.auth-card){padding:18px 13px!important}
+ body:has(.auth-card) .auth-card{padding:27px 21px!important;border-radius:21px!important}
+ .auth-card .logo{width:60px;height:60px;margin-bottom:17px!important}
+}
+@media(prefers-reduced-motion:reduce){.auth-card input,.auth-card .btn.wide{transition:none}}
+
 </style></head>
 <body style="margin:0;min-height:100vh;background:#0e1b14;color:#f4efe0;font-family:system-ui,-apple-system,sans-serif">
 <div id="app" class="wrap">
