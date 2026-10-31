@@ -15,10 +15,10 @@ const statusNames = {
   ready_for_pickup:"Ready for pickup", picked_up:"Picked up", out_for_delivery:"Out for delivery",
   delivered:"Delivered", cancelled:"Cancelled", rejected:"Rejected", delivery_failed:"Delivery failed"
 };
-const tabs = [["home","⌂","Overview"],["orders","▤","Orders"],["menu","▦","Menu"],["inventory","▣","Inventory"],["reservations","◷","Bookings"],["riders","♧","Riders"],["reports","▥","Reports"],["settings","⚙","Store setup"],["alerts","♢","Alerts"]];
+const tabs = [["home","⌂","Overview"],["orders","▤","Orders"],["menu","▦","Menu"],["inventory","▣","Inventory"],["payments","₹","Payments"],["reservations","◷","Bookings"],["riders","♧","Riders"],["reports","▥","Reports"],["settings","⚙","Store setup"],["alerts","♢","Alerts"]];
 // Temporary development-only UI preview. Live data and all write operations remain protected.
 const DEVELOPMENT_PREVIEW = false;
-let user=null, role=null, page="home", orders=[], menuItems=[], menuCategories=[], reservations=[], riders=[], notifications=[], availabilityRequests=[], settings=null, channel=null, busy=false, availabilityRefreshTimer=null;
+let user=null, role=null, page="home", orders=[], menuItems=[], menuCategories=[], reservations=[], riders=[], notifications=[], availabilityRequests=[], payments=[], settings=null, channel=null, busy=false, availabilityRefreshTimer=null;
 
 function toast(message, bad=false){
   let el=document.getElementById("admin-toast");
@@ -205,6 +205,15 @@ function availabilityRequestsView(){
     (recent.length?'<div class="mute" style="margin-top:16px">Recent decisions</div>'+recent.map(availabilityRequestCard).join(""):'')+
     '</section>';
 }
+function paymentsView(){
+  const pending=payments.filter(p=>p.status==="pending");
+  return '<section class="partner-panel"><div class="panel-heading"><div><h2>UPI payment verification</h2><p>Check the customer's UTR/reference and payment screenshot before confirming the order.</p></div><span class="pill">'+pending.length+' awaiting review</span></div>'+
+    (payments.map(p=>'<article class="card" style="margin:12px 0"><div class="row"><b>Order #'+esc(p.orders?.order_no||"—")+'</b><span class="tag '+(p.status==="approved"?"s-served":p.status==="rejected"?"s-cancelled":"s-new")+'">'+esc(p.status)+'</span></div>'+
+    '<p class="mute">'+esc(p.orders?.customer_name||"Customer")+' · '+esc(p.orders?.customer_phone||"")+'</p><p><b>Amount: '+money(p.orders?.total||0)+'</b></p><p class="mute">UPI reference: <b>'+esc(p.upi_reference)+'</b></p>'+
+    (p.screenshot_url?'<a href="'+esc(p.screenshot_url)+'" target="_blank" rel="noopener" class="btn ghost sm">View payment screenshot ↗</a>':'<small>Screenshot link unavailable. Refresh to request a new secure link.</small>')+
+    (p.status==="pending"?'<div class="actions"><button class="btn sm" data-payment-review="'+esc(p.id)+'" data-decision="approved">Verify & confirm order</button><button class="btn ghost sm" data-payment-review="'+esc(p.id)+'" data-decision="rejected">Reject proof</button></div>':'<p class="mute">Review note: '+esc(p.review_note||"—")+'</p>')+
+    '</article>').join("")||empty("No UPI payment submissions yet."))+'</section>';
+}
 function alertsView(){
   return notifications.map(n=>'<div class="item-row"><div class="item-meta"><b>'+esc(n.title)+'</b><span class="mute">'+esc(n.body||"")+'</span><span class="mute">'+new Date(n.created_at).toLocaleString()+'</span></div>'+(n.is_read?"":'<button class="btn ghost sm" data-read="'+esc(n.id)+'">Mark read</button>')+'</div>').join("")||empty("No notifications yet.");
 }
@@ -236,7 +245,7 @@ function render(){
   nav();
   const titles={home:["Overview","Live restaurant operations and business pulse."],orders:["Order desk","Manage incoming orders through kitchen and delivery stages."],menu:["Menu management","Control dishes, categories, prices, photos and availability."],inventory:["Inventory","Physical stock counts synced with customer ordering."],reservations:["Bookings","Customer reservation requests."],riders:["Delivery team","Rider accounts and availability."],reports:["Reports","Sales trends and top-selling menu items."],settings:["Store setup","Restaurant profile, operating status, delivery and payment configuration."],alerts:["Notifications","Live operational alerts and order updates."]};
   const t=titles[page]||titles.home;
-  let content=page==="home"?homeView():page==="orders"?ordersView():page==="menu"?menuView():page==="inventory"?inventoryView():page==="reservations"?reservationsView():page==="riders"?ridersView():page==="reports"?reportsView():page==="settings"?settingsView():alertsView();
+  let content=page==="home"?homeView():page==="orders"?ordersView():page==="payments"?paymentsView():page==="menu"?menuView():page==="inventory"?inventoryView():page==="reservations"?reservationsView():page==="riders"?ridersView():page==="reports"?reportsView():page==="settings"?settingsView():alertsView();
   shell(t[0],t[1],content);
   bindActions();
 }
@@ -249,14 +258,14 @@ async function refresh(){
   const results=await Promise.allSettled([api("orders"),api("menu"),api("reservations"),api("riders"),
     supabase.from("notifications").select("id,title,body,order_id,is_read,created_at").order("created_at",{ascending:false}).limit(60),
     supabase.from("restaurant_settings").select("*").eq("id",1).single(),
-    role==="owner"?api("availability"):Promise.resolve({requests:[]})]);
+    role==="owner"?api("availability"):Promise.resolve({requests:[]}),\n    (role==="owner"||role==="manager")?api("payments"):Promise.resolve({payments:[]})]);
   if(results[0].status==="fulfilled")orders=results[0].value.orders||[];
   if(results[1].status==="fulfilled")menuItems=results[1].value.items||[];
   if(results[2].status==="fulfilled")reservations=results[2].value.reservations||[];
   if(results[3].status==="fulfilled")riders=results[3].value.riders||[];
   if(results[4].status==="fulfilled"&&!results[4].value.error)notifications=results[4].value.data||[];
   if(results[5].status==="fulfilled"&&!results[5].value.error)settings=results[5].value.data;
-  if(results[6].status==="fulfilled")availabilityRequests=results[6].value.requests||[];
+  if(results[6].status==="fulfilled")availabilityRequests=results[6].value.requests||[];\n  if(results[7].status==="fulfilled")payments=results[7].value.payments||[];
   const categoryResult=await supabase.from("menu_categories").select("id,name,active,sort_order").order("sort_order");if(!categoryResult.error)menuCategories=categoryResult.data||[];
   render();
 }
@@ -308,6 +317,15 @@ function bindActions(){
       await refresh();
       toast(decision==="approved"?"Delivery approved. Customer can now pay and place the order.":"Delivery request rejected.");
     }catch(e){toast(e.message||"Availability decision failed.",true);b.disabled=false;}
+  });
+  document.querySelectorAll("[data-payment-review]").forEach(b=>b.onclick=async()=>{
+    const decision=b.dataset.decision;
+    const note=decision==="rejected"?(prompt("Reason for rejecting this payment proof:")||"Payment proof not accepted"): "Payment verified by staff";
+    if(decision==="rejected"&&!confirm("Reject this payment proof? The customer can submit a corrected proof."))return;
+    if(decision==="approved"&&!confirm("Confirm payment received and move this order to Confirmed?"))return;
+    b.disabled=true;
+    try{await api("",{action:"review_upi_payment",submission_id:b.dataset.paymentReview,decision,note});await refresh();toast(decision==="approved"?"Payment verified. Order confirmed.":"Payment proof rejected.");}
+    catch(e){toast(e.message||"Payment review failed.",true);b.disabled=false;}
   });
   document.querySelectorAll("[data-order]").forEach(b=>b.onclick=async()=>{
     b.disabled=true;try{await api("",{action:"update_order_status",order_id:b.dataset.order,status:b.dataset.status});await refresh();toast("Order status updated.");}catch(e){toast(e.message,true);b.disabled=false;}
