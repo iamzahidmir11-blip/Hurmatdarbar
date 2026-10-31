@@ -116,6 +116,7 @@ class MainActivity : Activity() {
    status.text="Allow location permission to start background sharing."
    return
   }
+  if(android.os.Build.VERSION.SDK_INT>=33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){sharingOrderId=orderId;requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS),7102);status.text="Allow notifications for visible live-location sharing.";return}
   val accessToken=token
   if(accessToken.isNullOrBlank()){status.text="Sign in again before sharing location.";return}
   try {
@@ -135,10 +136,10 @@ class MainActivity : Activity() {
  }
  override fun onRequestPermissionsResult(requestCode:Int,permissions:Array<out String>,grantResults:IntArray) {
   super.onRequestPermissionsResult(requestCode,permissions,grantResults)
-  if(requestCode==7101) {
+  if(requestCode==7101 || requestCode==7102) {
    val orderId=sharingOrderId
    if(grantResults.any { it==PackageManager.PERMISSION_GRANTED } && orderId!=null) startLocationSharing(orderId)
-   else { sharingOrderId=null; status.text="Location permission denied; sharing is off." }
+   else { sharingOrderId=null; status.text="Required permission denied; location sharing is off." }
   }
  }
  private fun availability(value:Boolean){
@@ -149,7 +150,7 @@ class MainActivity : Activity() {
  private fun update(id:String,next:String,reason:String?){
   status.text="Updating order…"
   worker.execute{try{val b=JSONObject().put("action","update_order_status").put("order_id",id).put("status",next);if(reason!=null)b.put("reason",reason)
-   request(base+"/functions/v1/restaurant-api","POST",b.toString(),token);if(next=="delivery_failed"||next=="delivered")stopLocationSharing();runOnUiThread{orders()}}
+   request(base+"/functions/v1/restaurant-api","POST",b.toString(),token);runOnUiThread{if(next=="delivery_failed"||next=="delivered")stopLocationSharing();orders()}}
    catch(ex:Exception){runOnUiThread{status.text=message(ex)}}}
  }
  private fun request(url:String,method:String,body:String?,bearer:String?):JSONObject{
