@@ -244,7 +244,12 @@ async function pollAvailabilityStatus(){
     checkoutState();
     setTimeout(()=>{if(id===availabilityRequestId)pollAvailabilityStatus()},5000);
   }catch(error){
-    availabilityPolling=false;availabilityMessage="Waiting for Owner response. Connection will retry automatically.";
+    availabilityPolling=false;
+    if(String(error?.message||error).toLowerCase().includes("request_not_found")){
+      clearAvailability("Your previous delivery request is no longer available. Please check delivery availability again.");
+      return;
+    }
+    availabilityMessage="Waiting for Owner response. Connection will retry automatically.";
     checkoutState();
     setTimeout(()=>{if(id===availabilityRequestId)pollAvailabilityStatus()},7000);
   }
