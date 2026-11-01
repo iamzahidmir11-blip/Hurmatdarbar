@@ -117,14 +117,14 @@ function nextStatus(s){
 function orderCard(o){
   const items=(o.order_items||[]).map(i=>esc(i.qty)+" × "+esc(i.item_name)+" ("+esc(i.variant_label)+")").join("<br>");
   const next=nextStatus(o.status);
-  const canAdvance=next&&!(next==="confirmed"&&o.payment_method==="upi_manual"&&o.payment_status!=="paid");
+  const canAdvance=next&&next!=="delivered"&&!(next==="confirmed"&&o.payment_method==="upi_manual"&&o.payment_status!=="paid");
   const riderOptions=riders.map(r=>'<option value="'+esc(r.user_id)+'">'+esc(r.name||"Rider")+(r.is_online?" · Online":" · Offline")+'</option>').join("");
   return '<article class="card" style="margin:10px 0"><div class="row"><b>Order #'+esc(o.order_no)+'</b><span class="tag s-'+(o.status==="delivered"?"served":o.status==="cancelled"||o.status==="rejected"?"cancelled":o.status==="preparing"?"preparing":o.status==="ready_for_pickup"?"ready":"new")+'">'+esc(statusNames[o.status]||o.status)+'</span></div>'+
     '<p class="mute" style="margin:8px 0">'+esc(o.customer_name)+' · '+esc(o.customer_phone)+'</p><p class="mute">'+esc(o.address_text)+'</p><p style="margin:10px 0;line-height:1.7">'+(items||"No item details")+'</p>'+
     '<div class="row"><span class="mute">'+new Date(o.created_at).toLocaleString()+'</span><b class="price">'+money(o.total)+'</b></div>'+
     '<p class="mute" style="margin-top:7px">Payment: '+esc(o.payment_method)+' · '+esc(o.payment_status)+'</p>'+
     (canAdvance?'<div class="actions"><button class="btn sm" data-order="'+esc(o.id)+'" data-status="'+next+'">Mark '+esc(statusNames[next])+'</button><button class="btn sm ghost" data-cancel="'+esc(o.id)+'">Cancel / reject</button></div>':'')+
-    (next==="confirmed"&&o.payment_method==="upi_manual"&&o.payment_status!=="paid"?'<p class="mute">Awaiting UPI payment verification. Review it in Payments before confirming this order.</p>':"")+
+    (next==="delivered"?'<p class="mute">Delivery completion is locked. The rider must verify the customer delivery code in the Rider App.</p>':"")+    (next==="confirmed"&&o.payment_method==="upi_manual"&&o.payment_status!=="paid"?'<p class="mute">Awaiting UPI payment verification. Review it in Payments before confirming this order.</p>':"")+
     (o.status==="ready_for_pickup"&&riderOptions?'<div class="actions"><select id="rider-'+esc(o.id)+'"><option value="">Choose rider</option>'+riderOptions+'</select><button class="btn sm ghost" data-assign="'+esc(o.id)+'">Assign rider</button></div>':'')+
     '</article>';
 }
