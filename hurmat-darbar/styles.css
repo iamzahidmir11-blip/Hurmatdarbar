@@ -1172,3 +1172,20 @@ body.customer-locked #my-account #customer-auth-form input{min-height:46px!impor
 body.customer-locked #my-account #customer-auth-form .btn{width:100%!important}
 body.customer-locked #my-account #customer-auth-form .btn.ghost{background:#f4f3ef!important}
 body.customer-locked #my-account #customer-auth-form .service-kicker{letter-spacing:1.5px}
+
+
+/* Customer account flow: login first, then a simple dashboard navigation. */
+body.customer-locked #my-account #customer-profile-card{display:none!important}
+body.customer-authenticated #my-account #customer-auth-form{display:none!important}
+body.customer-authenticated #my-account .service-grid{display:block!important;max-width:760px!important}
+body.customer-authenticated #my-account #customer-profile-card{display:block!important;max-width:760px;margin:0 auto}
+body.customer-authenticated main>section[hidden]{display:none!important}
+.customer-bottom-nav{position:fixed;z-index:9990;left:50%;bottom:max(12px,env(safe-area-inset-bottom));transform:translateX(-50%);width:min(440px,calc(100% - 24px));display:flex;justify-content:space-around;gap:8px;padding:9px 10px;background:rgba(255,255,255,.97);border:1px solid #e8e5de;border-radius:20px;box-shadow:0 8px 35px rgba(0,0,0,.16);backdrop-filter:blur(14px)}
+.customer-bottom-nav[hidden]{display:none!important}
+.customer-bottom-nav button{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:3px;border:0;border-radius:13px;background:transparent;color:#555;padding:8px 5px;cursor:pointer;font:inherit}
+.customer-bottom-nav button span{font-size:20px;line-height:1.1}
+.customer-bottom-nav button small{font-size:11px;font-weight:800;white-space:nowrap}
+.customer-bottom-nav button.active{background:#171717;color:#fff}
+body.customer-authenticated footer{padding-bottom:105px}
+body.customer-authenticated #my-account{padding-bottom:130px!important}
+@media(min-width:760px){.customer-bottom-nav{bottom:20px}}
