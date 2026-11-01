@@ -207,7 +207,7 @@ class MainActivity : Activity() {
   }
  }
  private fun render(o:JSONObject) {
-  val card=LinearLayout(this).apply{orientation=1;setPadding(16,14,16,14);background=rounded(Color.WHITE,20f);elevation=3f}
+  val card=LinearLayout(this).apply{orientation=1;setPadding(16,14,16,14);background=android.graphics.drawable.GradientDrawable().apply{setColor(Color.argb(246,255,255,255));cornerRadius=23f;setStroke(1,Color.rgb(222,231,223))};elevation=7f}
   val id=o.optString("id"); val state=o.optString("status")
   val stageLabel=when(state){"pending_confirmation"->"Waiting for restaurant confirmation";"confirmed"->"Confirmed • waiting for kitchen";"preparing"->"Kitchen is preparing";"ready_for_pickup"->"Ready for pickup";"picked_up"->"Picked up";"out_for_delivery"->"Out for delivery";"delivered"->"Delivered";"delivery_failed"->"Delivery failed";"cancelled"->"Cancelled";"rejected"->"Rejected";else->state.replace('_',' ')}
   card.addView(label("HURMAT DELIVERY  •  ACTIVE ORDER",9f))\n  card.addView(label("Order #"+o.optString("order_no"),21f))\n  card.addView(label("●  "+stageLabel,12f))
