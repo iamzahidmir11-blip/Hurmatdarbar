@@ -240,7 +240,7 @@ class MainActivity : Activity() {
    android.app.AlertDialog.Builder(this).setTitle("Delivery failed").setView(reason).setNegativeButton("Back",null)
     .setPositiveButton("Submit"){_,_->val r=reason.text.toString().trim();if(r.isBlank())status.text="Reason is required." else update(id,"delivery_failed",r)}.show()
   })
-  root.addView(card,LinearLayout.LayoutParams(-1,-2).apply{topMargin=10})
+  root.addView(card,LinearLayout.LayoutParams(-1,-2).apply{topMargin=10;bottomMargin=4})
  }
 
  private fun startLocationSharing(orderId:String) {
