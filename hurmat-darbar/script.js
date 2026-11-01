@@ -812,8 +812,17 @@ if(trackingForm)trackingForm.addEventListener("submit",async e=>{
  publicTrackingToken=token;
  try{
    const data=await refreshPublicTracking(token,box);
-   if(data&&["picked_up","out_for_delivery"].includes(data.status)){
-     publicTrackingTimer=setInterval(async()=>{if(document.hidden||publicTrackingToken!==token)return;try{const latest=await refreshPublicTracking(token,box);if(!latest||!["picked_up","out_for_delivery"].includes(latest.status)){clearInterval(publicTrackingTimer);publicTrackingTimer=null;}}catch{}},8000);
+   const terminalTrackingStatuses=["delivered","cancelled","rejected","delivery_failed"];
+   if(data&&!terminalTrackingStatuses.includes(data.status)){
+     publicTrackingTimer=setInterval(async()=>{
+       if(document.hidden||publicTrackingToken!==token)return;
+       try{
+         const latest=await refreshPublicTracking(token,box);
+         if(!latest||terminalTrackingStatuses.includes(latest.status)){
+           clearInterval(publicTrackingTimer);publicTrackingTimer=null;
+         }
+       }catch{}
+     },8000);
    }
  }catch(err){box.textContent="Tracking is temporarily unavailable: "+(err.message||"Try again later.");}
  finally{button.disabled=false;button.textContent="Track order ↗";}
