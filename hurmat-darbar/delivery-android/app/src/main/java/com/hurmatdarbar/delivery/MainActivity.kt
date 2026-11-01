@@ -188,15 +188,15 @@ class MainActivity : Activity() {
   } catch(ex:Exception){runOnUiThread{status.text=message(ex)}} }
  }
  private fun renderAvailable(o:JSONObject) {
-  val card=LinearLayout(this).apply{orientation=1;setPadding(16,14,16,14);background=rounded(Color.WHITE,20f);elevation=3f}
+  val card=LinearLayout(this).apply{orientation=1;setPadding(16,14,16,14);background=android.graphics.drawable.GradientDrawable().apply{setColor(Color.argb(246,255,255,255));cornerRadius=23f;setStroke(1,Color.rgb(222,231,223))};elevation=7f}
   val id=o.optString("id")
-  card.addView(label("ORDER #"+o.optString("order_no")+"  ·  READY FOR PICKUP",16f))
+  card.addView(label("✦  NEW PICKUP REQUEST",10f))\n  card.addView(label("ORDER #"+o.optString("order_no"),20f))
   card.addView(label(o.optString("customer_name")+"\n"+o.optString("address_text")))
   card.addView(label("Total: ₹"+o.optInt("total")+"  ·  "+o.optString("payment_method")))
   val items=o.optJSONArray("order_items")?:JSONArray()
   for(i in 0 until items.length()){val it=items.optJSONObject(i)?:continue;card.addView(label(it.optString("item_name")+" × "+it.optInt("qty"),13f))}
   card.addView(button("Accept delivery"){claimOrder(id)})
-  root.addView(card,LinearLayout.LayoutParams(-1,-2).apply{topMargin=10})
+  root.addView(card,LinearLayout.LayoutParams(-1,-2).apply{topMargin=10;bottomMargin=4})
  }
  private fun claimOrder(id:String) {
   status.text="Accepting order…"
@@ -210,7 +210,7 @@ class MainActivity : Activity() {
   val card=LinearLayout(this).apply{orientation=1;setPadding(16,14,16,14);background=rounded(Color.WHITE,20f);elevation=3f}
   val id=o.optString("id"); val state=o.optString("status")
   val stageLabel=when(state){"pending_confirmation"->"Waiting for restaurant confirmation";"confirmed"->"Confirmed • waiting for kitchen";"preparing"->"Kitchen is preparing";"ready_for_pickup"->"Ready for pickup";"picked_up"->"Picked up";"out_for_delivery"->"Out for delivery";"delivered"->"Delivered";"delivery_failed"->"Delivery failed";"cancelled"->"Cancelled";"rejected"->"Rejected";else->state.replace('_',' ')}
-  card.addView(label("Order #"+o.optString("order_no")+" • "+stageLabel,17f))
+  card.addView(label("HURMAT DELIVERY  •  ACTIVE ORDER",9f))\n  card.addView(label("Order #"+o.optString("order_no"),21f))\n  card.addView(label("●  "+stageLabel,12f))
   card.addView(label(o.optString("customer_name")+" • "+o.optString("customer_phone")))
   card.addView(label(o.optString("address_text")))
   card.addView(label("Payment: "+o.optString("payment_method")+" ("+o.optString("payment_status")+")"))
