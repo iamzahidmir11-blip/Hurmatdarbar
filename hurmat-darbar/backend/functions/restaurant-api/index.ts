@@ -1,9 +1,19 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
+const APP_ORIGIN = "https://iamzahidmir11-blip.github.io";
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": APP_ORIGIN,
   "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Max-Age": "600",
+  "Vary": "Origin",
+  "Cache-Control": "no-store",
+  "Pragma": "no-cache",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "no-referrer",
+  "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
 };
 
 function reply(body: unknown, status = 200) {
@@ -19,7 +29,13 @@ function isUuid(value: unknown): value is string {
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const requestOrigin = req.headers.get("Origin");
+  if (requestOrigin && requestOrigin !== APP_ORIGIN) {
+    return reply({ error: "origin_not_allowed" }, 403);
+  }
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
   if (req.method !== "POST" && req.method !== "GET") return reply({ error: "method_not_allowed" }, 405);
 
   const authHeader = req.headers.get("Authorization") ?? "";
@@ -145,7 +161,16 @@ Deno.serve(async (req: Request) => {
       return reply({ orders: data ?? [] });
     }
 
-    const body = await req.json().catch(() => null);
+    const contentLength = Number(req.headers.get("Content-Length") || "0");
+    if (Number.isFinite(contentLength) && contentLength > 65536) {
+      return reply({ error: "request_body_too_large" }, 413);
+    }
+    const rawBody = await req.text();
+    if (new TextEncoder().encode(rawBody).byteLength > 65536) {
+      return reply({ error: "request_body_too_large" }, 413);
+    }
+    let body: any = null;
+    try { body = JSON.parse(rawBody); } catch { body = null; }
     if (!body || typeof body !== "object" || Array.isArray(body)) {
       return reply({ error: "invalid_json_body" }, 400);
     }
