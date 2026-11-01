@@ -75,9 +75,9 @@ class MainActivity : Activity() {
  private fun setup(title:String) {
   root=LinearLayout(this).apply { orientation=1; setPadding(18,20,18,28); setBackgroundColor(paper) }
   val hero=LinearLayout(this).apply { orientation=1; setPadding(20,18,20,18); background=rounded(forest,24f); elevation=4f }
-  hero.addView(TextView(this).apply { text="H U R M A T   D A R B A R"; textSize=11f; letterSpacing=1.6f; setTextColor(gold); setTypeface(null,Typeface.BOLD) })
+  hero.addView(TextView(this).apply { text="H U R M A T   D E L I V E R Y"; textSize=11f; letterSpacing=1.6f; setTextColor(gold); setTypeface(null,Typeface.BOLD) })
   hero.addView(TextView(this).apply { text=title; textSize=27f; setTextColor(Color.WHITE); setTypeface(null,Typeface.BOLD); setPadding(0,10,0,4) })
-  hero.addView(TextView(this).apply { text="RIDER DELIVERY CONSOLE"; textSize=10f; letterSpacing=1.4f; setTextColor(Color.rgb(204,218,204)) })
+  hero.addView(TextView(this).apply { text="DELIVERY PARTNER APP"; textSize=10f; letterSpacing=1.4f; setTextColor(Color.rgb(204,218,204)) })
   root.addView(hero,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=16})
   status=TextView(this).apply { text="Connecting to delivery system…"; textSize=12f; setTextColor(ink); setPadding(4,8,4,14) }; root.addView(status)
   setContentView(ScrollView(this).apply { isFillViewport=true; addView(root) })
