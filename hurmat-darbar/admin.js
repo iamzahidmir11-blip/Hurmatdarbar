@@ -620,7 +620,7 @@ async function startApp(){
 }
 async function init(){
   if(DEVELOPMENT_PREVIEW){await startApp();return;}
-  try{const {data:{session}}=await supabase.auth.getSession();if(await verifyAccess())await startApp();else loginView("");}
+  try{const {data:{session}}=await supabase.auth.getSession();if(await verifyAccess()){if(new URLSearchParams(location.search).get("tab")==="notifications")page="alerts";await startApp();}else loginView("");}
   catch(e){loginView(e.message||"Unable to verify account.");}
 }
 if(!DEVELOPMENT_PREVIEW)supabase.auth.onAuthStateChange((event,session)=>{
