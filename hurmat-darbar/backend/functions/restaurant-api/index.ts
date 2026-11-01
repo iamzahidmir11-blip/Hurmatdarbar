@@ -83,10 +83,17 @@ Deno.serve(async (req: Request) => {
           .eq("customer_id", user.id).order("created_at", { ascending: false }).limit(30);
         if (error) return reply({ error: "my_orders_unavailable" }, 500);
         const ids = (data ?? []).map((o: { id: string }) => o.id);
-        const { data: proofs } = ids.length ? await supabase.from("payment_submissions")
-          .select("id,order_id,upi_reference,status,review_note,created_at")
-          .eq("customer_id", user.id).in("order_id", ids).order("created_at", { ascending: false }) : { data: [] };
-        return reply({ orders: data ?? [], payments: proofs ?? [] });
+        const [proofResult, ordersWithDeliveryCodes] = await Promise.all([
+          ids.length ? supabase.from("payment_submissions")
+            .select("id,order_id,upi_reference,status,review_note,created_at")
+            .eq("customer_id", user.id).in("order_id", ids).order("created_at", { ascending: false }) : Promise.resolve({ data: [] }),
+          Promise.all((data ?? []).map(async (order: Record<string, any>) => {
+            if (!["picked_up", "out_for_delivery"].includes(order.status)) return order;
+            const { data: deliveryCode } = await supabase.rpc("get_customer_delivery_code", { p_order: order.id });
+            return { ...order, delivery_code: deliveryCode ?? null };
+          })),
+        ]);
+        return reply({ orders: ordersWithDeliveryCodes, payments: proofResult.data ?? [] });
       }
       if (view === "refunds") {
         if (![...roles].some((r) => ["owner", "manager"].includes(r))) return reply({ error: "forbidden" }, 403);
