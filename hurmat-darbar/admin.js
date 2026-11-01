@@ -18,7 +18,7 @@ const statusNames = {
 const tabs = [["home","⌂","Overview"],["orders","▤","Orders"],["menu","▦","Menu"],["inventory","▣","Inventory"],["availability","✓","Delivery checks"],["payments","₹","Payments"],["refunds","↩","Refunds"],["reservations","◷","Bookings"],["riders","♧","Riders"],["reports","▥","Reports"],["settings","⚙","Store setup"],["alerts","♢","Alerts"]];
 // Temporary development-only UI preview. Live data and all write operations remain protected.
 const DEVELOPMENT_PREVIEW = false;
-let user=null, role=null, page="home", orders=[], menuItems=[], menuCategories=[], reservations=[], riders=[], notifications=[], availabilityRequests=[], cashCollections=[], availabilityLoadError="", payments=[], refunds=[], settings=null, channel=null, busy=false, availabilityRefreshTimer=null;
+let user=null, role=null, page="home", orders=[], menuItems=[], menuCategories=[], reservations=[], riders=[], riderLocations=[], notifications=[], availabilityRequests=[], cashCollections=[], availabilityLoadError="", payments=[], refunds=[], settings=null, channel=null, busy=false, availabilityRefreshTimer=null;
 
 function toast(message, bad=false){
   let el=document.getElementById("admin-toast");
@@ -175,7 +175,7 @@ function ridersView(){
   const list=riders.map(r=>'<div class="item-row"><div class="item-meta"><b>'+esc(r.name||"Rider")+'</b><span class="mute">'+esc(r.phone||"No phone on file")+'</span></div><span class="tag '+(r.is_online?"s-ready":"s-served")+'">'+(r.is_online?"Online":"Offline")+'</span></div>').join("")||empty("No rider accounts are linked yet.");
   const create=role==="owner"?'<section class="partner-panel" style="margin:12px 0"><div class="panel-heading"><div><h2>Create rider account</h2><p>Creates the secure sign-in, rider role and delivery profile together.</p></div></div><form id="rider-create-form" class="card"><label>Rider full name</label><input id="rider-name" required minlength="2" maxlength="80" placeholder="Full name"><label>Rider phone</label><input id="rider-phone" required type="tel" minlength="7" maxlength="20" placeholder="Phone number"><label>Rider email</label><input id="rider-email" required type="email" autocomplete="off" placeholder="rider@example.com"><label>Temporary password (10+ chars, uppercase, lowercase, number and symbol)</label><input id="rider-password" required type="password" minlength="10" autocomplete="new-password" placeholder="Create a temporary password"><button class="btn wide" id="rider-create-submit" type="submit">Create rider account</button><p class="mute" style="font-size:11px;line-height:1.6;margin-top:10px">Share the temporary password privately. The rider can sign in to the separate Hurmat Darbar Delivery app.</p></form></section>':"";
   const cashRows=cashCollections.map(c=>'<article class="card" style="margin:10px 0"><div class="row"><b>Order #'+esc(c.orders?.order_no||"—")+'</b><span class="tag '+(c.handed_over?"s-served":"s-new")+'">'+(c.handed_over?"Handed over":"Cash with rider")+'</span></div><p class="mute">'+esc(c.rider_name||"Rider")+' · '+money(c.amount)+' · '+new Date(c.collected_at).toLocaleString()+'</p>'+(c.handed_over?'<p class="mute">Received '+(c.handed_over_at?new Date(c.handed_over_at).toLocaleString():"")+'</p>':'<button class="btn sm" data-cash-handover="'+esc(c.order_id)+'">Confirm cash received</button>')+'</article>').join("")||empty("No COD cash collections recorded yet.");
-  return create+'<section class="partner-panel"><div class="panel-heading"><div><h2>Registered riders</h2><p>Online availability updates from the delivery app.</p></div></div>'+list+'</section><section class="partner-panel" style="margin-top:14px"><div class="panel-heading"><div><h2>COD cash reconciliation</h2><p>Cash recorded by riders after customer delivery.</p></div><span class="pill">'+cashCollections.filter(c=>!c.handed_over).length+' pending</span></div>'+cashRows+'</section>';
+  const locationRows=riderLocations.map(p=>{const rider=riders.find(r=>r.user_id===p.rider_id);return '<div class="item-row"><div class="item-meta"><b>'+esc(rider?.name||"Rider")+' · Order #'+esc(p.order_no||"—")+'</b><span class="mute">GPS '+esc(new Date(p.created_at).toLocaleTimeString())+' · accuracy '+esc(Math.round(Number(p.accuracy||0)))+'m</span></div><a class="btn sm" target="_blank" rel="noopener" href="https://www.google.com/maps?q='+encodeURIComponent(p.lat+","+p.lng)+'">View live location ↗</a></div>';}).join("")||empty("No recent GPS location. Rider must be online and share location during an active delivery.");\n  return create+'<section class="partner-panel"><div class="panel-heading"><div><h2>Registered riders</h2><p>Online availability updates from the delivery app.</p></div></div>'+list+'</section><section class="partner-panel" style="margin-top:14px"><div class="panel-heading"><div><h2>Live GPS tracker</h2><p>Recent rider positions for active deliveries. Refreshes automatically.</p></div><span class="pill">GPS</span></div>'+locationRows+'</section><section class="partner-panel" style="margin-top:14px"><div class="panel-heading"><div><h2>COD cash reconciliation</h2><p>Cash recorded by riders after customer delivery.</p></div><span class="pill">'+cashCollections.filter(c=>!c.handed_over).length+' pending</span></div>'+cashRows+'</section>';
 }
 function reportsView(){
   const now=new Date(),days=[];
@@ -288,6 +288,7 @@ function settingsView(){
 :"")+
     '';
 }
+function riderFormEditing(){const form=document.getElementById("rider-create-form");return !!(form&&form.contains(document.activeElement));}
 function render(){
   nav();
   const titles={home:["Overview","Live restaurant operations and business pulse."],orders:["Order desk","Manage incoming orders through kitchen and delivery stages."],availability:["Delivery checks","Review every customer delivery request and respond YES or NO."],payments:["Payments","Verify UPI references and customer payment screenshots."],refunds:["Refunds","Review cancellations and record verified customer refunds."],menu:["Menu management","Control dishes, categories, prices, photos and availability."],inventory:["Inventory","Physical stock counts synced with customer ordering."],reservations:["Bookings","Customer reservation requests."],riders:["Delivery team","Rider accounts and availability."],reports:["Reports","Sales trends and top-selling menu items."],settings:["Store setup","Restaurant profile, operating status, delivery and payment configuration."],alerts:["Notifications","Live operational alerts and order updates."]};
@@ -311,7 +312,7 @@ async function refresh(){
   if(results[0].status==="fulfilled")orders=results[0].value.orders||[];
   if(results[1].status==="fulfilled")menuItems=results[1].value.items||[];
   if(results[2].status==="fulfilled")reservations=results[2].value.reservations||[];
-  if(results[3].status==="fulfilled")riders=results[3].value.riders||[];
+  if(results[3].status==="fulfilled"){riders=results[3].value.riders||[];riderLocations=results[3].value.locations||[];}
   if(results[4].status==="fulfilled"&&!results[4].value.error)notifications=results[4].value.data||[];
   if(results[5].status==="fulfilled"&&!results[5].value.error)settings=results[5].value.data;
   if(results[6].status==="fulfilled"){availabilityRequests=results[6].value.requests||[];availabilityLoadError="";}
@@ -320,7 +321,7 @@ async function refresh(){
   if(results[8].status==="fulfilled")payments=results[8].value.payments||[];
   if(results[9].status==="fulfilled")refunds=results[9].value.refunds||[];
   const categoryResult=await supabase.from("menu_categories").select("id,name,active,sort_order").order("sort_order");if(!categoryResult.error)menuCategories=categoryResult.data||[];
-  render();
+  if(!riderFormEditing())render();
 }
 function bindActions(){
   document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{page=b.dataset.go;render();});
@@ -537,7 +538,7 @@ function bindActions(){
     button.disabled=true;button.textContent="Creating secure rider account…";
     try{
       await api("",{action:"create_rider_account",name,phone,email,password});
-      riderForm.reset();await refresh();toast("Rider account and delivery profile created.");
+      riderForm.reset();await refresh();render();toast("Rider account and delivery profile created.");
     }catch(err){
       const messages={rider_accounts_not_configured:"Secure rider account creation is not configured on the server.",rider_email_already_registered:"This email already has a Supabase account. Use a new rider email, or ask the owner to activate the existing account.",rider_account_creation_failed:"Supabase could not create this rider login. Check the email and try again.",rider_role_activation_failed:"The login was created but rider access could not be activated. Contact support before trying again.",rider_profile_creation_failed:"Rider login/profile setup failed. Contact support before retrying.",invalid_rider_email:"Enter a valid rider email address.",weak_rider_password:"Use 10+ characters with uppercase, lowercase, a number and a symbol.",invalid_rider_profile:"Enter a valid rider name and phone number."};
       toast(messages[err.message]||err.message||"Rider account could not be created.",true);
@@ -609,13 +610,17 @@ async function startApp(){
         const result=await api("availability"),next=result.requests||[];
         if(JSON.stringify(next)!==JSON.stringify(availabilityRequests)){availabilityRequests=next;changed=true;}
       }
+      if(page==="riders"){
+        const riderResult=await api("riders"),nextRiders=riderResult.riders||[],nextLocations=riderResult.locations||[];
+        if(JSON.stringify(nextRiders)!==JSON.stringify(riders)||JSON.stringify(nextLocations)!==JSON.stringify(riderLocations)){riders=nextRiders;riderLocations=nextLocations;changed=true;}
+      }
       if(role==="owner"||role==="manager"){
         const result=await api("payments"),next=result.payments||[];
         if(JSON.stringify(next)!==JSON.stringify(payments)){payments=next;changed=true;}
         const refundResult=await api("refunds"),nextRefunds=refundResult.refunds||[];
         if(JSON.stringify(nextRefunds)!==JSON.stringify(refunds)){refunds=nextRefunds;changed=true;}
       }
-      if(changed)render();
+      if(changed&&!riderFormEditing())render();
     }catch(error){console.warn("Live dashboard refresh failed:",error);}
   },8000);
   if(channel)await supabase.removeChannel(channel);
