@@ -44,8 +44,8 @@ class MainActivity : Activity() {
  private fun showLogin(message:String="") {
   setupRoot()
   root.gravity=Gravity.CENTER_HORIZONTAL
-  root.addView(label("H U R M A T   D A R B A R",13f).apply { setTextColor(gold) })
-  root.addView(label("Admin Console",30f))
+  root.addView(label("H U R M A T   O W N E R",13f).apply { setTextColor(gold) })
+  root.addView(label("Owner Console",30f))
   root.addView(label("Sign in with an owner/admin account created by the restaurant owner."))
   val email=field("Email address").apply { inputType=33 }
   val password=field("Password",true)
