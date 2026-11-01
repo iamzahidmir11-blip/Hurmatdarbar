@@ -411,6 +411,20 @@ Deno.serve(async (req: Request) => {
         return reply({ ok: true });
       }
 
+      case "verify_delivery_code": {
+        if (!roles.has("rider")) return reply({ error: "forbidden" }, 403);
+        if (!isUuid(body.order_id) || typeof body.code !== "string" || body.code.length !== 8) {
+          return reply({ error: "invalid_delivery_code" }, 400);
+        }
+        const { data, error } = await supabase.rpc("verify_delivery_code", {
+          p_order: body.order_id,
+          p_code: body.code.trim().toUpperCase(),
+        });
+        if (error) return reply({ error: error.message || "delivery_verification_failed" }, 400);
+        if (!data?.ok) return reply({ error: data?.error || "delivery_verification_failed" }, 400);
+        return reply({ ok: true, status: data.status, order_no: data.order_no });
+      }
+
       case "post_location": {
         if (!roles.has("rider")) return reply({ error: "forbidden" }, 403);
         if (!isUuid(body.order_id) || typeof body.lat !== "number" ||
