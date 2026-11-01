@@ -427,13 +427,23 @@ function setCustomerAuthMode(mode){
   document.getElementById("account-name").required=signup;
   document.getElementById("account-name").hidden=!signup;
   document.getElementById("account-phone").hidden=!signup;
-  document.getElementById("account-password").autocomplete=signup?"new-password":"current-password";
+  const passwordInput=document.getElementById("account-password");
+  passwordInput.autocomplete=signup?"new-password":"current-password";
+  // Existing accounts may have passwords shorter than the newer signup policy.
+  passwordInput.minLength=signup?10:8;
+  passwordInput.placeholder=signup?"10+ chars with uppercase, lowercase, number and symbol":"Enter your account password";
   document.getElementById("customer-auth-submit").textContent=signup?"Create account":"Log in";
   document.getElementById("customer-auth-switch").textContent=signup?"Already have an account? Log in":"New here? Create an account";
 }
 if(customerAuthForm){
   setCustomerAuthMode("login");
-  document.getElementById("customer-auth-switch").onclick=()=>setCustomerAuthMode(customerAuthMode==="signup"?"login":"signup");
+  const authSwitchButton=document.getElementById("customer-auth-switch");
+  authSwitchButton.addEventListener("click",event=>{
+    event.preventDefault();
+    setCustomerAuthMode(customerAuthMode==="signup"?"login":"signup");
+    customerAuthMessage("");
+    document.getElementById("account-email").focus();
+  });
   document.getElementById("customer-auth-logout").onclick=async()=>{
     const {error}=await db.auth.signOut();if(error){customerAuthMessage(error.message,true);return;}
     customerAuthMessage("You have logged out.");document.body.classList.add("customer-locked");document.body.classList.remove("customer-authenticated");updateCustomerDashboard(false);await loadCustomerProfile();await loadMyOrders();
@@ -447,7 +457,8 @@ if(customerAuthForm){
     const phone=document.getElementById("account-phone").value.trim();
     if(customerAuthMode==="signup"&&name.length<2){customerAuthMessage("Enter your full name.",true);return;}
     if(customerAuthMode==="signup"&&(password.length<10||!/[a-z]/.test(password)||!/[A-Z]/.test(password)||!/[0-9]/.test(password)||!/[^A-Za-z0-9]/.test(password))){customerAuthMessage("Use 10+ characters with uppercase, lowercase, a number and a symbol.",true);return;}
-    if(password.length<8){customerAuthMessage("Password must be at least 8 characters.",true);return;}
+    if(!email||!document.getElementById("account-email").checkValidity()){customerAuthMessage("Enter a valid email address.",true);return;}
+    if(password.length<(customerAuthMode==="signup"?10:8)){customerAuthMessage(customerAuthMode==="signup"?"Signup password must be at least 10 characters.":"Password must be at least 8 characters.",true);return;}
     button.disabled=true;button.textContent=customerAuthMode==="signup"?"Creating account…":"Logging in…";
     try{
       if(customerAuthMode==="signup"){
