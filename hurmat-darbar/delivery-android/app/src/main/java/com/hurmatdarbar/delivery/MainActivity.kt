@@ -108,6 +108,7 @@ class MainActivity : Activity() {
   startPolling()
   setup("My Deliveries")
   root.addView(button(if(online) "Go Offline" else "Go Online"){availability(!online)})
+  root.addView(button("Pending orders"){orderFilter="pending";orders()})
   root.addView(button("Active deliveries"){orderFilter="active";orders()})
   root.addView(button("Delivery history"){orderFilter="history";orders()})
   root.addView(button("All assigned orders"){orderFilter="all";orders()})
@@ -127,14 +128,15 @@ class MainActivity : Activity() {
     Toast.makeText(this,"New delivery assigned: "+numbers,Toast.LENGTH_LONG).show()
    }
    runOnUiThread {
+    val pending=setOf("pending_confirmation","confirmed","preparing")
     val active=setOf("ready_for_pickup","picked_up","out_for_delivery")
     val history=setOf("delivered","delivery_failed","cancelled","rejected")
     val filtered=(0 until rows.length()).mapNotNull { rows.optJSONObject(it) }.filter { order ->
      val s=order.optString("status")
-     when(orderFilter) { "history"->s in history; "all"->true; else->s in active }
+     when(orderFilter) { "pending"->s in pending; "history"->s in history; "all"->true; else->s in active }
     }
-    status.text=filtered.size.toString()+" order(s) • "+when(orderFilter){"history"->"History";"all"->"All assigned";else->"Active"}
-    if(filtered.isEmpty()) root.addView(label(when(orderFilter){"history"->"No completed or failed deliveries in your history.";"all"->"No assigned deliveries. Wait for the manager to assign an order.";else->"No active deliveries assigned right now."}))
+    status.text=filtered.size.toString()+" order(s) • "+when(orderFilter){"pending"->"Pending";"history"->"History";"all"->"All assigned";else->"Active"}
+    if(filtered.isEmpty()) root.addView(label(when(orderFilter){"pending"->"No pending orders. New assigned orders waiting for restaurant confirmation or preparation will appear here.";"history"->"No completed or failed deliveries in your history.";"all"->"No assigned deliveries. Wait for the manager to assign an order.";else->"No pickup-ready or ongoing deliveries right now. Check Pending orders for earlier stages."}))
     filtered.forEach { render(it) }
    }
   } catch(ex:Exception){runOnUiThread{status.text=message(ex)}} }
@@ -142,7 +144,8 @@ class MainActivity : Activity() {
  private fun render(o:JSONObject) {
   val card=LinearLayout(this).apply{orientation=1;setPadding(14,12,14,12);setBackgroundColor(Color.WHITE)}
   val id=o.optString("id"); val state=o.optString("status")
-  card.addView(label("Order #"+o.optString("order_no")+" • "+state.replace('_',' '),17f))
+  val stageLabel=when(state){"pending_confirmation"->"Waiting for restaurant confirmation";"confirmed"->"Confirmed • waiting for kitchen";"preparing"->"Kitchen is preparing";"ready_for_pickup"->"Ready for pickup";"picked_up"->"Picked up";"out_for_delivery"->"Out for delivery";"delivered"->"Delivered";"delivery_failed"->"Delivery failed";"cancelled"->"Cancelled";"rejected"->"Rejected";else->state.replace('_',' ')}
+  card.addView(label("Order #"+o.optString("order_no")+" • "+stageLabel,17f))
   card.addView(label(o.optString("customer_name")+" • "+o.optString("customer_phone")))
   card.addView(label(o.optString("address_text")))
   card.addView(label("Payment: "+o.optString("payment_method")+" ("+o.optString("payment_status")+")"))
