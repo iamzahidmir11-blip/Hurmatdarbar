@@ -267,7 +267,7 @@ class MainActivity : Activity() {
  private fun update(id:String,next:String,reason:String?){
   status.text="Updating order…"
   worker.execute{try{val b=JSONObject().put("action","update_order_status").put("order_id",id).put("status",next);if(reason!=null)b.put("reason",reason)
-   request(base+"/functions/v1/restaurant-api","POST",b.toString(),token);runOnUiThread{if(next=="delivery_failed"||next=="delivered")stopLocationSharing();orders()}}
+   request(base+"/functions/v1/restaurant-api","POST",b.toString(),token);runOnUiThread{if(next=="picked_up")startLocationSharing(id);if(next=="delivery_failed"||next=="delivered")stopLocationSharing();orders()}}
    catch(ex:Exception){runOnUiThread{status.text=message(ex)}}}
  }
  private fun request(url:String,method:String,body:String?,bearer:String?):JSONObject{
