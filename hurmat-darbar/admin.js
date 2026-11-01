@@ -289,7 +289,7 @@ function settingsView(){
 :"")+
     '';
 }
-function riderFormEditing(){const form=document.getElementById("rider-create-form");return !!(form&&form.contains(document.activeElement));}
+function riderFormEditing(){return !!document.getElementById("rider-create-form");}
 function render(){
   nav();
   const titles={home:["Overview","Live restaurant operations and business pulse."],orders:["Order desk","Manage incoming orders through kitchen and delivery stages."],availability:["Delivery checks","Review every customer delivery request and respond YES or NO."],payments:["Payments","Verify UPI references and customer payment screenshots."],refunds:["Refunds","Review cancellations and record verified customer refunds."],menu:["Menu management","Control dishes, categories, prices, photos and availability."],inventory:["Inventory","Physical stock counts synced with customer ordering."],reservations:["Bookings","Customer reservation requests."],riders:["Delivery team","Rider accounts and availability."],reports:["Reports","Sales trends and top-selling menu items."],settings:["Store setup","Restaurant profile, operating status, delivery and payment configuration."],alerts:["Notifications","Live operational alerts and order updates."]};
