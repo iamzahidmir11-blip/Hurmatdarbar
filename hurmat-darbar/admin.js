@@ -223,7 +223,10 @@ function refundsView(){
   const active=refunds.filter(r=>["pending_review","approved","processing"].includes(r.status));
   return '<section class="partner-panel"><div class="panel-heading"><div><h2>Customer refunds</h2><p>Only mark a refund completed after the money has actually been returned. Enter the real UPI/bank reference.</p></div><span class="pill">'+active.length+' active</span></div>'+
     (refunds.map(r=>'<article class="card" style="margin:12px 0"><div class="row"><b>Order #'+esc(r.orders?.order_no||"—")+' · '+esc(r.orders?.customer_name||"Customer")+'</b><span class="tag '+(r.status==="completed"?"s-served":r.status==="rejected"?"s-cancelled":"s-new")+'">'+esc(r.status.replaceAll("_"," "))+'</span></div>'+
-    '<p class="mute">'+esc(r.orders?.customer_phone||"")+' · '+new Date(r.requested_at).toLocaleString()+'</p><p><b>Refund amount: '+money(r.amount)+'</b></p><p class="mute">Reason: '+esc(r.reason)+'</p>'+
+    '<p class="mute">'+esc(r.orders?.customer_phone||"")+' · '+new Date(r.requested_at).toLocaleString()+'</p><p><b>Refund amount: '+money(r.amount)+'</b></p>'+
+    (Number(r.cancellation_fee)>0?'<p class="mute">6% cancellation charge: '+money(r.cancellation_fee)+'</p>':'')+
+    (r.bank_details?'<div class="card" style="margin:8px 0;padding:12px"><b>Customer bank details</b><p class="mute">Account holder: '+esc(r.bank_details.account_holder)+'</p><p class="mute">Bank: '+esc(r.bank_details.bank_name)+'</p><p class="mute">Account number: '+esc(r.bank_details.account_number)+'</p><p class="mute">IFSC: '+esc(r.bank_details.ifsc)+'</p></div>':'<p class="mute">Bank details: Not submitted yet</p>')+
+    '<p class="mute">Reason: '+esc(r.reason)+'</p>'+
     (r.refund_reference?'<p class="mute">Refund reference: '+esc(r.refund_reference)+'</p>':'')+(r.owner_note?'<p class="mute">Note: '+esc(r.owner_note)+'</p>':'')+
     (r.status==="pending_review"?'<div class="actions"><button class="btn sm" data-refund="'+esc(r.id)+'" data-refund-status="approved">Approve refund</button><button class="btn ghost sm" data-refund="'+esc(r.id)+'" data-refund-status="rejected">Reject</button></div>':'')+
     (r.status==="approved"?'<div class="actions"><button class="btn sm" data-refund="'+esc(r.id)+'" data-refund-status="processing">Mark processing</button></div>':'')+
