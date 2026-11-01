@@ -393,11 +393,25 @@ function applyCustomerGate(){
     return signedIn;
   }).catch(()=>{document.body.classList.add("customer-locked");return false;});
 }
+let activeCustomerUserId=null;
+let myOrdersLoadVersion=0;
+function resetCustomerOrders(message){
+  if(!myOrdersRoot)return;
+  myOrdersLoadVersion++;
+  myOrdersRoot.replaceChildren();
+  if(message)myOrdersRoot.append(el("p","my-orders-empty",message));
+}
 db.auth.onAuthStateChange((event,session)=>{
   const signedIn=!!session?.user&&!session.user.is_anonymous;
+  const nextUserId=signedIn?session.user.id:null;
   document.body.classList.toggle("customer-locked",!signedIn);
   document.body.classList.toggle("customer-authenticated",signedIn);
   updateCustomerDashboard(signedIn);
+  if(nextUserId!==activeCustomerUserId){
+    activeCustomerUserId=nextUserId;
+    resetCustomerOrders(signedIn?"Loading your orders…":"Log in to see your orders.");
+    if(signedIn)Promise.resolve().then(()=>loadMyOrders(nextUserId));
+  }
 });
 // Keep the page locked until Supabase confirms a registered customer session.
 applyCustomerGate();
@@ -555,20 +569,37 @@ function renderMyOrders(data,payments,refunds=[]){
     myOrdersRoot.append(card);
   });
 }
-async function loadMyOrders(){
+async function loadMyOrders(expectedUserId=null){
   if(!myOrdersRoot)return;
+  let requestVersion=0,userId=null;
   try{
-    const data=await callRestaurantApi("GET","view=my_orders");
     const {data:{user}}=await db.auth.getUser();
-    const {data:refundRows}=user?await db.from("refund_requests").select("id,order_id,amount,reason,status,refund_reference,owner_note,requested_at,processed_at").eq("customer_id",user.id).order("requested_at",{ascending:false}).limit(30):{data:[]};
+    if(!user||user.is_anonymous){
+      resetCustomerOrders("Log in to see your orders.");
+      return;
+    }
+    userId=user.id;
+    if(expectedUserId&&expectedUserId!==userId)return;
+    requestVersion=++myOrdersLoadVersion;
+    const data=await callRestaurantApi("GET","view=my_orders");
+    const {data:{user:verifiedUser}}=await db.auth.getUser();
+    if(requestVersion!==myOrdersLoadVersion||!verifiedUser||verifiedUser.is_anonymous||verifiedUser.id!==userId)return;
+    const {data:refundRows}=await db.from("refund_requests").select("id,order_id,amount,reason,status,refund_reference,owner_note,requested_at,processed_at").eq("customer_id",userId).order("requested_at",{ascending:false}).limit(30);
     const enriched=await Promise.all((data.orders||[]).slice(0,12).map(async o=>{
       if(["delivered","cancelled","rejected","delivery_failed"].includes(o.status))return o;
       const {data:live}=await db.rpc("track_order",{p_token:o.tracking_token});
       return {...o,live:live||null};
     }));
+    const {data:{user:finalUser}}=await db.auth.getUser();
+    if(requestVersion!==myOrdersLoadVersion||!finalUser||finalUser.is_anonymous||finalUser.id!==userId)return;
     renderMyOrders(enriched,data.payments||[],refundRows||[]);
   }
-  catch(e){myOrdersRoot.textContent="Your order history will appear here after you place an order on this device.";}
+  catch(e){
+    if(requestVersion&&requestVersion!==myOrdersLoadVersion)return;
+    const {data:{user:currentUser}}=await db.auth.getUser().catch(()=>({data:{user:null}}));
+    if(userId&&currentUser?.id!==userId)return;
+    resetCustomerOrders("Your order history could not be loaded. Please refresh.");
+  }
 }
 
 const trackingForm=document.getElementById("tracking-form");
