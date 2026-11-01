@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Hurmat Owner | Restaurant Operations</title>
-<meta name="theme-color" content="#f4f2ec"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Hurmat Owner"><link rel="apple-touch-icon" href="../assets/hurmat-logo-repo.png"><link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="../assets/hurmat-logo-repo.png" type="image/png"><link rel="preconnect" href="https://fonts.googleapis.com">
+<meta name="theme-color" content="#f4f2ec"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Hurmat Owner"><link rel="apple-touch-icon" href="../assets/hurmat-owner-app-icon.svg"><link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="../assets/hurmat-owner-app-icon.svg" type="image/svg+xml"><link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
 <style>
 .logo img{display:block;width:100%;height:100%;object-fit:contain;border-radius:10px}.logo:has(img){background:transparent;color:transparent;border:0;padding:0;overflow:hidden}
@@ -601,6 +601,60 @@ body:has(.auth-card) .auth-card:after{
 .auth-card .btn.wide{background:linear-gradient(105deg,#29312d,#414943)!important;box-shadow:0 8px 20px rgba(35,44,38,.15)!important}
 .auth-card .btn.wide:hover{background:linear-gradient(105deg,#38423b,#515c53)!important}
 
+
+/* Hurmat Owner mobile-first navigation and app controls */
+.owner-header-actions{position:relative;display:flex;align-items:center;gap:10px}
+.owner-more-menu{width:min(340px,calc(100vw - 24px))!important;max-height:min(72vh,620px);overflow:auto;padding:12px!important;border-radius:22px!important;background:rgba(7,39,27,.97)!important;border:1px solid rgba(184,245,139,.2)!important}
+.owner-more-menu[hidden]{display:none!important}
+.menu-panel-head{display:flex;align-items:center;justify-content:space-between;padding:10px 12px 13px;color:#eaffdf}
+.menu-panel-head b{font-size:10px;letter-spacing:.16em}
+.menu-panel-head small{font-size:9px;color:#b9d6bd}
+.owner-more-menu button{display:flex;align-items:center;gap:12px;width:100%;min-height:46px;padding:10px 12px;border:1px solid transparent;border-radius:13px;background:transparent;color:#effbf0;font:650 13px Manrope;text-align:left}
+.owner-more-menu .menu-item-icon{width:34px;height:34px;display:grid;place-items:center;flex:none;border-radius:11px;background:rgba(184,245,139,.11);color:#c9f7a8;font-size:18px}
+.owner-more-menu .menu-item-label{flex:1;width:auto!important}
+.owner-more-menu .menu-item-arrow{width:auto!important;color:rgba(229,255,228,.5);font-size:20px}
+.owner-more-menu .menu-control{background:rgba(184,245,139,.08);border-color:rgba(184,245,139,.17)}
+.owner-more-menu .menu-control strong{font-size:10px;color:#d9f7bd;white-space:nowrap}
+.owner-more-menu .menu-divider{height:1px;margin:9px 7px;background:rgba(255,255,255,.12)}
+.owner-more-menu .menu-signout{color:#ffd5ce}
+.owner-more-menu .menu-signout .menu-item-icon{background:rgba(219,83,66,.15);color:#ffaaa0}
+.tracking-summary,.profile-hero{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:22px;background:linear-gradient(125deg,#073b29,#14533b);color:#f6fff5;border-radius:20px;margin-bottom:16px;box-shadow:0 14px 32px rgba(6,48,31,.12)}
+.tracking-summary h2,.profile-hero h2{font:700 22px Manrope;margin:4px 0 7px}
+.tracking-summary p,.profile-hero p{font-size:12px;line-height:1.6;color:rgba(242,255,244,.72);max-width:540px}
+.tracking-count{display:grid;gap:2px;text-align:center;min-width:90px;padding:13px;border:1px solid rgba(255,255,255,.2);border-radius:15px;background:rgba(255,255,255,.08)}
+.tracking-count b{font-size:27px;color:#d8f6a8}.tracking-count span{font-size:9px;color:#e5f1e5}
+.tracking-card{display:flex;align-items:center;gap:13px;padding:14px 0;border-bottom:1px solid var(--line)}
+.tracking-card:last-child{border-bottom:0}
+.tracking-pin{width:40px;height:40px;display:grid;place-items:center;flex:none;border-radius:13px;background:#e9f5ed;color:#17613d;font-size:22px}
+.tracking-copy{display:grid;gap:4px;flex:1;min-width:0}
+.tracking-copy b{font-size:12px;color:#26332c}
+.tracking-copy span,.tracking-copy small{font-size:10px;color:#7d887f}
+.profile-hero{justify-content:flex-start}
+.profile-avatar{width:58px;height:58px;display:grid;place-items:center;flex:none;border-radius:19px;background:linear-gradient(145deg,#d7bd7a,#a47d3e);color:#183c2a;font-size:25px;font-weight:800}
+#owner-profile-form{display:grid;gap:7px}
+#owner-profile-form label{margin-top:8px;color:#68756d;font-size:11px;font-weight:700}
+#owner-profile-form input{background:#f8faf8;color:#24352b;border:1px solid #e0e8e2;border-radius:11px;padding:12px}
+#owner-profile-form input:disabled{color:#8a938d;background:#f0f2f0}
+@media(max-width:760px){
+ .partner-topbar{padding:0 13px!important;height:66px!important}
+ .topbar-brand .logo{width:39px!important;height:39px!important}
+ .topbar-brand b{font-size:11px!important}
+ .topbar-brand small{font-size:8px!important}
+ .owner-header-actions{gap:7px!important}
+ .header-icon{width:40px!important;height:40px!important;border-radius:13px!important}
+ .owner-more-menu{position:fixed!important;top:74px!important;right:12px!important;left:auto!important;width:min(350px,calc(100vw - 24px))!important;max-height:calc(100dvh - 100px)!important}
+ .partner-main{padding:17px 12px 118px!important}
+ #nav{height:72px!important;bottom:calc(10px + env(safe-area-inset-bottom,0))!important;width:calc(100vw - 22px)!important;border-radius:23px!important}
+ #nav .dock-item{gap:3px!important}
+ #nav .dock-item .dock-icon{width:35px;height:35px;border-radius:12px}
+ #nav .dock-item small{font-size:9px!important}
+ .tracking-summary,.profile-hero{padding:17px;border-radius:17px}
+ .tracking-card{align-items:flex-start;flex-wrap:wrap}
+ .tracking-card .btn{margin-left:53px}
+ .page-heading{align-items:flex-start}
+ .page-heading h1{font-size:25px!important}
+}
+@media(max-width:390px){#nav .dock-item small{font-size:8px!important}.owner-role-pill{display:none!important}.tracking-count{min-width:74px}}
 </style></head>
 <body style="margin:0;min-height:100vh;background:#0e1b14;color:#f4efe0;font-family:system-ui,-apple-system,sans-serif">
 <div id="app" class="wrap">
@@ -627,7 +681,7 @@ body:has(.auth-card) .auth-card:after{
   } catch(e) {}
   try {
     status.textContent='Loading secure owner system…';
-    await import('../admin.js?v=owner-code-only-delivery-20261101-8');
+    await import('../admin.js?v=owner-mobile-app-shell-20261101-9');
   } catch(e) {
     status.textContent='Owner app could not start.';
     detail.textContent=(e && e.message ? e.message : 'Please check the internet connection, then refresh.');
