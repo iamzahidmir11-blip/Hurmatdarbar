@@ -79,6 +79,9 @@ Deno.serve(async (req: Request) => {
           .order("requested_at", { ascending: false }).limit(100);
         if (error) return reply({ error: "refunds_unavailable" }, 500);
         const refunds = await Promise.all((data ?? []).map(async (item: Record<string, any>) => {
+          if (!roles.has("owner")) {
+            return { ...item, bank_details: null, bank_details_restricted: true };
+          }
           const { data: bankRows, error: bankError } = await supabase.rpc("get_refund_bank_details", {
             p_refund_id: item.id,
           });
