@@ -167,7 +167,7 @@ class MainActivity : Activity() {
   card.addView(label("Total: ₹"+o.optInt("total")+"  ·  "+o.optString("payment_method")))
   val items=o.optJSONArray("order_items")?:JSONArray()
   for(i in 0 until items.length()){val it=items.optJSONObject(i)?:continue;card.addView(label(it.optString("item_name")+" × "+it.optInt("qty"),13f))}
-  card.addView(button("Accept & pick this order"){claimOrder(id)})
+  card.addView(button("Accept delivery"){claimOrder(id)})
   root.addView(card,LinearLayout.LayoutParams(-1,-2).apply{topMargin=10})
  }
  private fun claimOrder(id:String) {
