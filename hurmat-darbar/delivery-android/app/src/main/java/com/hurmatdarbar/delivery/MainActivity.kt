@@ -162,7 +162,11 @@ class MainActivity : Activity() {
   }
   val next=when(state){"ready_for_pickup"->"picked_up";"picked_up"->"out_for_delivery";else->null}
   if(next!=null) card.addView(button(next.replace('_',' ').uppercase()){update(id,next,null)})
-  if(state=="out_for_delivery") card.addView(label("Delivery completion is locked until customer OTP verification is implemented.",13f))
+  if(state=="out_for_delivery") card.addView(button("Verify customer code & complete delivery"){
+   val code=EditText(this).apply{hint="Enter the 8-character customer code";setSingleLine(true);filters=arrayOf(android.text.InputFilter.LengthFilter(8));}
+   android.app.AlertDialog.Builder(this).setTitle("Confirm delivery").setMessage("Ask the customer to open My Orders and show their delivery verification code.").setView(code).setNegativeButton("Back",null)
+    .setPositiveButton("Verify & mark delivered"){_,_->val value=code.text.toString().trim().uppercase();if(value.length!=8)status.text="Enter the complete 8-character code." else verifyDelivery(id,value)}.show()
+  })
   if(state=="out_for_delivery") card.addView(button("Report delivery failed"){
    val reason=EditText(this).apply{hint="Reason required";setSingleLine(true)}
    android.app.AlertDialog.Builder(this).setTitle("Delivery failed").setView(reason).setNegativeButton("Back",null)
@@ -210,6 +214,15 @@ class MainActivity : Activity() {
   status.text="Updating availability…"
   worker.execute{try{request(base+"/functions/v1/restaurant-api","POST",JSONObject().put("action","set_rider_availability").put("is_online",value).toString(),token);online=value;runOnUiThread{orders()}}
    catch(ex:Exception){runOnUiThread{status.text=message(ex)}}}
+ }
+ private fun verifyDelivery(id:String,code:String){
+  status.text="Verifying customer delivery code…"
+  worker.execute{try{
+   val payload=JSONObject().put("action","verify_delivery_code").put("order_id",id).put("code",code)
+   request(base+"/functions/v1/restaurant-api","POST",payload.toString(),token)
+   runOnUiThread{stopLocationSharing();Toast.makeText(this,"Delivery verified and completed.",Toast.LENGTH_LONG).show();orders()}
+  }catch(ex:Exception){runOnUiThread{status.text=message(ex)}}
+  }
  }
  private fun update(id:String,next:String,reason:String?){
   status.text="Updating order…"
