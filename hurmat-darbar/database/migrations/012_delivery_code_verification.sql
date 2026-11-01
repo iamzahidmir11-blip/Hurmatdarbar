@@ -24,7 +24,7 @@ set search_path = public, private, pg_temp
 as $$
 begin
   insert into private.delivery_verification_codes(order_id, customer_id, code)
-  values (new.id, new.customer_id, upper(substr(encode(gen_random_bytes(4), 'hex'), 1, 8)));
+  values (new.id, new.customer_id, upper(substr(encode(extensions.gen_random_bytes(4), 'hex'), 1, 8)));
   return new;
 end;
 $$;
