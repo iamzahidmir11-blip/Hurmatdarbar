@@ -82,7 +82,9 @@ Deno.serve(async (req: Request) => {
         const { data, error } = await supabase.from("riders")
           .select("user_id,name,phone,is_online,last_seen").eq("user_id", user.id).maybeSingle();
         if (error || !data) return reply({ error: "rider_profile_unavailable" }, 404);
-        return reply({ ...data });
+        const isFreshOnline = Boolean(data.is_online && data.last_seen &&
+          new Date(data.last_seen).getTime() >= Date.now() - 15 * 60 * 1000);
+        return reply({ ...data, is_online: isFreshOnline });
       }
       if (view === "available_orders") {
         if (!roles.has("rider")) return reply({ error: "forbidden" }, 403);
