@@ -172,8 +172,6 @@ function updatePaymentInfo(){
       window.location.href="upi://pay?"+params.toString();
     };
     paymentInfo.append(copy,open);paymentInfo.hidden=false;
-  }else{
-    paymentInfo.hidden=true;
   }else paymentInfo.hidden=true;
 }
 function checkoutState(){
