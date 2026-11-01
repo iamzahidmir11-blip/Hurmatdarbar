@@ -152,11 +152,12 @@ class MainActivity : Activity() {
   root.addView(button("Delivery history"){orderFilter="history";orders()})
   root.addView(button("All assigned orders"){orderFilter="all";orders()})
   root.addView(button("Refresh"){orders()})
-  root.addView(button("Sign Out"){stopPolling();stopLocationSharing();clearSession();online=false;knownOrderIds.clear();firstOrdersLoad=true;login()})
+  root.addView(button("Sign Out"){signOutRider()})
   status.text=if(orderFilter=="available") "Finding pickup-ready orders…" else "Loading assigned orders…"
   worker.execute { try {
    val self=request(base+"/functions/v1/restaurant-api?view=rider_self","GET",null,token)
    online=self.optBoolean("is_online",false)
+   if(online) request(base+"/functions/v1/restaurant-api","POST",JSONObject().put("action","set_rider_availability").put("is_online",true).toString(),token)
    val endpoint=if(orderFilter=="available") base+"/functions/v1/restaurant-api?view=available_orders" else base+"/functions/v1/restaurant-api"
    val rows=request(endpoint,"GET",null,token).optJSONArray("orders")?:JSONArray()
    val loaded=(0 until rows.length()).mapNotNull { rows.optJSONObject(it) }
@@ -233,6 +234,7 @@ class MainActivity : Activity() {
   }
   val next=when(state){"ready_for_pickup"->"picked_up";"picked_up"->"out_for_delivery";else->null}
   if(next!=null) card.addView(button(next.replace('_',' ').uppercase()){update(id,next,null)})
+  if(state=="delivered" && o.optString("payment_method")=="cod" && o.optString("payment_status")=="cod_pending") card.addView(button("Record COD cash collected"){recordCash(id)})
   if(state=="out_for_delivery") card.addView(button("Verify customer code & complete delivery"){
    val code=EditText(this).apply{hint="Enter the 8-character customer code";setSingleLine(true);filters=arrayOf(android.text.InputFilter.LengthFilter(8));}
    android.app.AlertDialog.Builder(this).setTitle("Confirm delivery").setMessage("Ask the customer to open My Orders and show their delivery verification code.").setView(code).setNegativeButton("Back",null)
@@ -280,6 +282,26 @@ class MainActivity : Activity() {
    if(grantResults.any { it==PackageManager.PERMISSION_GRANTED } && orderId!=null) startLocationSharing(orderId)
    else { sharingOrderId=null; status.text="Required permission denied; location sharing is off." }
   }
+ }
+ private fun signOutRider(){
+  status.text="Signing out securely…"
+  stopPolling()
+  worker.execute{
+   try{
+    val current=token
+    if(!current.isNullOrBlank()) request(base+"/functions/v1/restaurant-api","POST",JSONObject().put("action","set_rider_availability").put("is_online",false).toString(),current)
+   }catch(_:Exception){}
+   runOnUiThread{
+    stopLocationSharing();clearSession();online=false;knownOrderIds.clear();firstOrdersLoad=true;login()
+   }
+  }
+ }
+ private fun recordCash(id:String){
+  status.text="Recording COD collection…"
+  worker.execute{try{
+   request(base+"/functions/v1/restaurant-api","POST",JSONObject().put("action","record_cod_cash").put("order_id",id).toString(),token)
+   runOnUiThread{Toast.makeText(this,"COD collection recorded. Hand the cash to the owner.",Toast.LENGTH_LONG).show();orders()}
+  }catch(ex:Exception){runOnUiThread{status.text=message(ex)}}}
  }
  private fun availability(value:Boolean){
   status.text="Updating availability…"
