@@ -681,7 +681,7 @@ body:has(.auth-card) .auth-card:after{
   } catch(e) {}
   try {
     status.textContent='Loading secure owner system…';
-    await import('../admin.js?v=owner-mobile-app-shell-20261101-9');
+    await import('../admin.js?v=owner-mobile-app-shell-20261101-10');
   } catch(e) {
     status.textContent='Owner app could not start.';
     detail.textContent=(e && e.message ? e.message : 'Please check the internet connection, then refresh.');
