@@ -364,7 +364,8 @@ function updateCustomerDashboard(signedIn){
   if(nav)nav.hidden=!signedIn;
   if(auth)auth.hidden=!!signedIn;
   if(profile)profile.hidden=!signedIn;
-  if(signedIn)showCustomerTab("profile");
+  if(!signedIn){document.querySelectorAll("[data-customer-tab]").forEach(b=>b.classList.remove("active"));}
+  else if(!document.querySelector("[data-customer-tab].active"))showCustomerTab("profile");
 }
 function showCustomerTab(tab){
   const menu=document.getElementById("menu"), services=document.getElementById("services"), account=document.getElementById("my-account"), orders=document.getElementById("my-orders"), visit=document.getElementById("visit");
