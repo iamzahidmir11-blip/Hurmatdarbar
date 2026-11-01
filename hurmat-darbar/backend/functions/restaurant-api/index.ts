@@ -170,7 +170,19 @@ Deno.serve(async (req: Request) => {
         if (![...roles].some((r) => ["owner", "manager", "delivery_manager"].includes(r))) return reply({ error: "forbidden" }, 403);
         const { data, error } = await supabase.from("riders").select("user_id, name, phone, is_online, last_seen").order("name");
         if (error) return reply({ error: "riders_unavailable" }, 500);
-        return reply({ riders: data ?? [] });
+        const activeSince = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+        const { data: locations, error: locationError } = await supabase.from("rider_locations")
+          .select("rider_id,order_id,lat,lng,accuracy,created_at,orders(order_no,status)")
+          .gte("created_at", activeSince).order("created_at", { ascending: false }).limit(100);
+        if (locationError) return reply({ error: "rider_locations_unavailable" }, 500);
+        const latest = new Map<string, Record<string, any>>();
+        for (const point of locations ?? []) {
+          const order = Array.isArray(point.orders) ? point.orders[0] : point.orders;
+          if (!latest.has(point.rider_id) && order && ["picked_up", "out_for_delivery"].includes(order.status)) {
+            latest.set(point.rider_id, { ...point, order_no: order.order_no });
+          }
+        }
+        return reply({ riders: data ?? [], locations: [...latest.values()] });
       }
       if (![...roles].some((r) => ["owner", "manager", "kitchen", "delivery_manager", "rider"].includes(r))) return reply({ error: "forbidden" }, 403);
       let orderQuery = supabase.from("orders")
