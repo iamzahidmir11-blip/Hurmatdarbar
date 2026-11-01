@@ -67,6 +67,9 @@ Last updated: 1 November 2026
 - Debug APKs are internal test builds, not production-signed releases. A production signing keystore and signed release build are still required.
 
 ## Security and reliability review
+- Security Advisor rechecked 1 November 2026: three anon-callable SECURITY DEFINER RPCs are `has_owner()`, `has_role(uid, roles)`, and `track_order(p_token)`. `has_role` is used by RLS for public menu reads and binds the supplied UID to the authenticated UID; `track_order` is the intended token-based customer tracking entry point. Do not revoke these blindly. The functions must remain narrowly scoped and tracking tokens must remain high-entropy and unguessable.
+- Twenty-seven authenticated SECURITY DEFINER RPC warnings remain. The advisor flags their privilege class, not proof of exploitability. Keep role/ownership checks in each function and review the full function body before changing ACLs.
+
 - Supabase project previously reported ACTIVE_HEALTHY; restaurant-api Edge Function is ACTIVE, version 35; send-push-notification is ACTIVE, version 2.
 - `restaurant-api` manually verifies the bearer token and checks active user roles. Its CORS origin is currently the GitHub Pages origin. A future custom domain must be added to the CORS allowlist before use.
 - Three RLS-enabled tables (`app_setup`, `delivery_availability_requests`, `refund_bank_details`) have no direct policies. Current grants show only postgres/service_role access, so these tables remain intended for restricted server/RPC access; do not add public table grants.
@@ -80,12 +83,12 @@ Last updated: 1 November 2026
 
 ## Handover tests still required before declaring production-ready
 - [ ] Open the live customer site in a normal browser and confirm the latest cache token is served.
-- [ ] Create a real customer test account using an email address controlled by the business, complete any email verification, log in, refresh and confirm the session persists.
+- [ ] Verify customer signup/login separately with a fresh customer account, email confirmation if enabled, refresh and persistent session. The reported order test confirms checkout was completed in an authenticated customer session, but signup itself was not separately confirmed.
 - [ ] Place a controlled low-value test order only after Owner authorizes a test; verify availability approval, order creation, Owner status updates and rider assignment.
-- [ ] Bring Rider online on the test phone, confirm a fresh heartbeat and location row, assign/accept a test order, then verify the customer tracking map updates.
-- [ ] Verify delivery-code completion and that rider location updates stop afterward.
+- [x] User-reported: Rider accepted/picked up the test order, location permission was allowed, and user independently checked GPS tracking successfully. [ ] Recheck fresh database heartbeat/location telemetry and test phone-locked/background reliability before claiming full resilience.
+- [ ] Verify delivery-code completion and that rider location updates stop afterward; this step was not explicitly included in the user's reported test.
 - [ ] Exercise UPI proof review, reservation handling, refunds and COD collection/handover only with explicitly approved test records. COD is currently disabled.
-- [ ] Enable leaked-password protection in Supabase Auth.
+- [ ] Enable leaked-password protection in Supabase Auth. This is an Auth dashboard security setting; it has not been changed from this workflow.
 - [ ] Create and securely store a production signing key, then build and test signed release APKs.
 - [ ] If using hurmatdarbar.com, configure DNS/domain and update Edge Function CORS before switching traffic.
 
