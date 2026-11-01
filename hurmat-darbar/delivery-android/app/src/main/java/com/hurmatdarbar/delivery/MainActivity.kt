@@ -108,26 +108,34 @@ class MainActivity : Activity() {
   startPolling()
   setup("My Deliveries")
   root.addView(button(if(online) "Go Offline" else "Go Online"){availability(!online)})
+  root.addView(button("Available to pick"){orderFilter="available";orders()})
   root.addView(button("Pending orders"){orderFilter="pending";orders()})
   root.addView(button("Active deliveries"){orderFilter="active";orders()})
   root.addView(button("Delivery history"){orderFilter="history";orders()})
   root.addView(button("All assigned orders"){orderFilter="all";orders()})
   root.addView(button("Refresh"){orders()})
   root.addView(button("Sign Out"){stopPolling();stopLocationSharing();clearSession();online=false;knownOrderIds.clear();firstOrdersLoad=true;login()})
-  status.text="Loading assigned orders…"
+  status.text=if(orderFilter=="available") "Finding pickup-ready orders…" else "Loading assigned orders…"
   worker.execute { try {
    val self=request(base+"/functions/v1/restaurant-api?view=rider_self","GET",null,token)
    online=self.optBoolean("is_online",false)
-   val rows=request(base+"/functions/v1/restaurant-api","GET",null,token).optJSONArray("orders")?:JSONArray()
+   val endpoint=if(orderFilter=="available") base+"/functions/v1/restaurant-api?view=available_orders" else base+"/functions/v1/restaurant-api"
+   val rows=request(endpoint,"GET",null,token).optJSONArray("orders")?:JSONArray()
    val loaded=(0 until rows.length()).mapNotNull { rows.optJSONObject(it) }
    val ids=loaded.map { it.optString("id") }.filter { it.isNotBlank() }
-   val newlyAssigned=if(firstOrdersLoad){firstOrdersLoad=false;knownOrderIds.addAll(ids);emptyList()}else loaded.filter { !knownOrderIds.contains(it.optString("id")) }
-   knownOrderIds.addAll(ids)
+   val newlyAssigned=if(orderFilter=="available"||firstOrdersLoad){if(orderFilter!="available"){firstOrdersLoad=false;knownOrderIds.addAll(ids)};emptyList()}else loaded.filter { !knownOrderIds.contains(it.optString("id")) }
+   if(orderFilter!="available")knownOrderIds.addAll(ids)
    if(newlyAssigned.isNotEmpty()) runOnUiThread {
     val numbers=newlyAssigned.take(3).joinToString(", ") { "#"+it.optString("order_no") }
     Toast.makeText(this,"New delivery assigned: "+numbers,Toast.LENGTH_LONG).show()
    }
    runOnUiThread {
+    if(orderFilter=="available"){
+     status.text=if(!online) "You are offline. Go online to see pickup requests." else loaded.size.toString()+" pickup-ready order(s) available"
+     if(!online||loaded.isEmpty())root.addView(label(if(!online)"Switch to Online to receive available orders." else "No unassigned pickup-ready orders right now."))
+     loaded.forEach { renderAvailable(it) }
+     return@runOnUiThread
+    }
     val pending=setOf("pending_confirmation","confirmed","preparing")
     val active=setOf("ready_for_pickup","picked_up","out_for_delivery")
     val history=setOf("delivered","delivery_failed","cancelled","rejected")
@@ -140,6 +148,25 @@ class MainActivity : Activity() {
     filtered.forEach { render(it) }
    }
   } catch(ex:Exception){runOnUiThread{status.text=message(ex)}} }
+ }
+ private fun renderAvailable(o:JSONObject) {
+  val card=LinearLayout(this).apply{orientation=1;setPadding(16,14,16,14);setBackgroundColor(Color.WHITE)}
+  val id=o.optString("id")
+  card.addView(label("ORDER #"+o.optString("order_no")+"  ·  READY FOR PICKUP",16f))
+  card.addView(label(o.optString("customer_name")+"\n"+o.optString("address_text")))
+  card.addView(label("Total: ₹"+o.optInt("total")+"  ·  "+o.optString("payment_method")))
+  val items=o.optJSONArray("order_items")?:JSONArray()
+  for(i in 0 until items.length()){val it=items.optJSONObject(i)?:continue;card.addView(label(it.optString("item_name")+" × "+it.optInt("qty"),13f))}
+  card.addView(button("Accept & pick this order"){claimOrder(id)})
+  root.addView(card,LinearLayout.LayoutParams(-1,-2).apply{topMargin=10})
+ }
+ private fun claimOrder(id:String) {
+  status.text="Accepting order…"
+  worker.execute { try {
+   request(base+"/functions/v1/restaurant-api","POST",JSONObject().put("action","claim_delivery_order").put("order_id",id).toString(),token)
+   runOnUiThread { Toast.makeText(this,"Order accepted. It is now assigned to you.",Toast.LENGTH_LONG).show();orderFilter="active";orders() }
+  } catch(ex:Exception){runOnUiThread{status.text=message(ex)}}
+  }
  }
  private fun render(o:JSONObject) {
   val card=LinearLayout(this).apply{orientation=1;setPadding(14,12,14,12);setBackgroundColor(Color.WHITE)}
