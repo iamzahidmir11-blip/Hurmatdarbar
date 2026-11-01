@@ -73,37 +73,65 @@ class MainActivity : Activity() {
  }
  private fun rounded(color:Int,radius:Float=18f)=GradientDrawable().apply { setColor(color); cornerRadius=radius }
  private fun setup(title:String) {
-  root=LinearLayout(this).apply { orientation=1; setPadding(18,20,18,28); setBackgroundColor(paper) }
-  val hero=LinearLayout(this).apply { orientation=1; setPadding(20,18,20,18); background=rounded(forest,24f); elevation=4f }
-  hero.addView(TextView(this).apply { text="H U R M A T   D E L I V E R Y"; textSize=11f; letterSpacing=1.6f; setTextColor(gold); setTypeface(null,Typeface.BOLD) })
-  hero.addView(TextView(this).apply { text=title; textSize=27f; setTextColor(Color.WHITE); setTypeface(null,Typeface.BOLD); setPadding(0,10,0,4) })
-  hero.addView(TextView(this).apply { text="DELIVERY PARTNER APP"; textSize=10f; letterSpacing=1.4f; setTextColor(Color.rgb(204,218,204)) })
-  root.addView(hero,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=16})
-  status=TextView(this).apply { text="Connecting to delivery system…"; textSize=12f; setTextColor(ink); setPadding(4,8,4,14) }; root.addView(status)
-  setContentView(ScrollView(this).apply { isFillViewport=true; addView(root) })
+  window.statusBarColor=Color.rgb(7,35,25); window.navigationBarColor=Color.rgb(7,35,25)
+  root=LinearLayout(this).apply {
+   orientation=1; setPadding(18,22,18,32)
+   background=android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,intArrayOf(Color.rgb(7,39,28),Color.rgb(16,62,43),Color.rgb(235,239,231))).apply{cornerRadius=0f}
+  }
+  val hero=LinearLayout(this).apply {
+   orientation=1; gravity=android.view.Gravity.CENTER; setPadding(22,24,22,23)
+   background=android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TL_BR,intArrayOf(Color.rgb(17,75,51),Color.rgb(7,37,27))).apply{cornerRadius=30f;setStroke(1,Color.argb(100,226,199,139))}
+   elevation=12f
+  }
+  val brandRow=LinearLayout(this).apply{orientation=0;gravity=android.view.Gravity.CENTER_VERTICAL}
+  val mark=ImageView(this).apply{setImageResource(com.hurmatdarbar.delivery.R.drawable.ic_hurmat_delivery);scaleType=ImageView.ScaleType.FIT_CENTER}
+  brandRow.addView(mark,LinearLayout.LayoutParams(58,58).apply{rightMargin=13})
+  val brandText=LinearLayout(this).apply{orientation=1}
+  brandText.addView(TextView(this).apply{text="HURMAT DARBAR";textSize=17f;letterSpacing=1.2f;setTextColor(Color.WHITE);setTypeface(null,Typeface.BOLD)})
+  brandText.addView(TextView(this).apply{text="DELIVERY PARTNER";textSize=9f;letterSpacing=2f;setTextColor(Color.rgb(225,202,151));setPadding(0,5,0,0)})
+  brandRow.addView(brandText);hero.addView(brandRow)
+  hero.addView(TextView(this).apply{text=title;textSize=28f;setTextColor(Color.WHITE);setTypeface(null,Typeface.BOLD);setPadding(0,22,0,5);gravity=android.view.Gravity.CENTER})
+  hero.addView(TextView(this).apply{text="Every order. Every mile. With care.";textSize=12f;setTextColor(Color.rgb(214,229,217));gravity=android.view.Gravity.CENTER})
+  root.addView(hero,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=17})
+  val statusCard=LinearLayout(this).apply{orientation=1;setPadding(16,12,16,12);background=android.graphics.drawable.GradientDrawable().apply{setColor(Color.argb(232,255,255,255));cornerRadius=18f;setStroke(1,Color.argb(90,255,255,255))};elevation=5f}
+  status=TextView(this).apply{text="●  Connecting to delivery system…";textSize=12f;setTextColor(ink);setPadding(2,2,2,2)}
+  statusCard.addView(status);root.addView(statusCard,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=12})
+  setContentView(ScrollView(this).apply{isFillViewport=true;addView(root)})
  }
  private fun label(s:String,size:Float=14f)=TextView(this).apply { text=s; textSize=size; setTextColor(ink); setPadding(0,7,0,7) }
  private fun button(s:String,action:()->Unit)=Button(this).apply {
-  text=s; isAllCaps=false; textSize=13f; setTextColor(Color.WHITE); background=rounded(forest,14f)
-  minHeight=48; setPadding(16,8,16,8); elevation=2f
+  text=s; isAllCaps=false; textSize=13f; typeface=Typeface.create("sans-serif-medium",Typeface.BOLD)
+  setTextColor(Color.WHITE)
+  background=android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,intArrayOf(Color.rgb(24,83,56),Color.rgb(9,48,33))).apply{cornerRadius=16f;setStroke(1,Color.argb(90,224,194,133))}
+  minHeight=52; setPadding(18,10,18,10); elevation=5f
   setOnClickListener { action() }
  }
- private fun field(s:String,secret:Boolean=false)=EditText(this).apply { hint=s; setSingleLine(true); if(secret) inputType=129 }
+ private fun field(s:String,secret:Boolean=false)=EditText(this).apply {
+  hint=s;setSingleLine(true);textSize=14f;setTextColor(ink);setHintTextColor(Color.rgb(125,139,129))
+  setPadding(16,14,16,14);background=android.graphics.drawable.GradientDrawable().apply{setColor(Color.rgb(248,250,247));cornerRadius=15f;setStroke(1,Color.rgb(219,228,220))}
+  if(secret)inputType=129
+ }
  private fun login() {
-  setup("Rider Sign In")
-  root.addView(label("Use the rider account created by the restaurant owner."))
-  val email=field("Email address"); email.inputType=33
-  val pass=field("Password",true); root.addView(email); root.addView(pass)
-  root.addView(button("Sign in") {
-   val e=email.text.toString().trim(); val p=pass.text.toString()
-   if(e.isBlank()||p.isBlank()){status.text="Email and password required.";return@button}
-   status.text="Signing in…"
-   worker.execute { try {
-    val s=request(base+"/auth/v1/token?grant_type=password","POST",JSONObject().put("email",e).put("password",p).toString(),null)
-    val t=s.optString("access_token"); if(t.isBlank()) throw Exception("No access token returned")
-    saveSession(t,s.optString("refresh_token")); runOnUiThread { orders() }
-   } catch(ex:Exception){runOnUiThread{status.text=message(ex)}} }
+  setup("Welcome, Rider")
+  val panel=LinearLayout(this).apply{orientation=1;setPadding(19,20,19,20);background=android.graphics.drawable.GradientDrawable().apply{setColor(Color.argb(245,255,255,255));cornerRadius=25f;setStroke(1,Color.rgb(220,229,220))};elevation=8f}
+  panel.addView(TextView(this).apply{text="Sign in to your shift";textSize=21f;setTextColor(ink);setTypeface(null,Typeface.BOLD);setPadding(0,0,0,5)})
+  panel.addView(TextView(this).apply{text="Use the secure rider account provided by the restaurant owner.";textSize=12f;setTextColor(Color.rgb(105,119,109));setPadding(0,0,0,17)})
+  val email=field("Email address");email.inputType=33
+  val pass=field("Password",true)
+  panel.addView(email,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=11})
+  panel.addView(pass,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=17})
+  panel.addView(button("Sign in securely  →") {
+   val e=email.text.toString().trim();val p=pass.text.toString()
+   if(e.isBlank()||p.isBlank()){status.text="●  Email and password required.";return@button}
+   status.text="●  Signing in…"
+   worker.execute{try{
+    val response=request(base+"/auth/v1/token?grant_type=password","POST",JSONObject().put("email",e).put("password",p).toString(),null)
+    val t=response.optString("access_token");if(t.isBlank())throw Exception("No access token returned")
+    saveSession(t,response.optString("refresh_token"));runOnUiThread{orders()}
+   }catch(ex:Exception){runOnUiThread{status.text="●  "+message(ex)}}}
   })
+  root.addView(panel,LinearLayout.LayoutParams(-1,-2).apply{topMargin=3;bottomMargin=14})
+  root.addView(TextView(this).apply{text="SECURE RIDER ACCESS  •  HURMAT DARBAR";textSize=9f;letterSpacing=1.2f;gravity=android.view.Gravity.CENTER;setTextColor(Color.rgb(230,221,194));setPadding(4,13,4,8)})
  }
  private fun startPolling() {
   if(polling)return
