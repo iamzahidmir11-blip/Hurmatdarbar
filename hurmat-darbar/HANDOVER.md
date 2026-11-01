@@ -84,8 +84,8 @@ Last updated: 1 November 2026
 ## Handover tests still required before declaring production-ready
 - [ ] Open the live customer site in a normal browser and confirm the latest cache token is served.
 - [ ] Verify customer signup/login separately with a fresh customer account, email confirmation if enabled, refresh and persistent session. The reported order test confirms checkout was completed in an authenticated customer session, but signup itself was not separately confirmed.
-- [ ] Place a controlled low-value test order only after Owner authorizes a test; verify availability approval, order creation, Owner status updates and rider assignment.
-- [x] User-reported: Rider accepted/picked up the test order, location permission was allowed, and user independently checked GPS tracking successfully. [ ] Recheck fresh database heartbeat/location telemetry and test phone-locked/background reliability before claiming full resilience.
+- [x] User-reported test order completed: customer order and payment receipt submitted; Owner processed/assigned it; Rider accepted and picked it up. No need to repeat this test unless a later error is reported.
+- [x] User-reported GPS check: Rider location permission allowed and live GPS tracking independently checked successfully. [ ] Background GPS with phone locked, battery optimisation and network-loss recovery remain resilience checks.
 - [ ] Verify delivery-code completion and that rider location updates stop afterward; this step was not explicitly included in the user's reported test.
 - [ ] Exercise UPI proof review, reservation handling, refunds and COD collection/handover only with explicitly approved test records. COD is currently disabled.
 - [ ] Enable leaked-password protection in Supabase Auth. This is an Auth dashboard security setting; it has not been changed from this workflow.
