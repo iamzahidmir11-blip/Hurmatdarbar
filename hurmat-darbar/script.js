@@ -357,6 +357,50 @@ if(reservationForm)reservationForm.addEventListener("submit",async e=>{
 });
 
 const myOrdersRoot=document.getElementById("my-orders-list");
+const customerNotificationsRoot=document.getElementById("customer-notifications-list");
+let customerNotificationChannel=null;
+function renderCustomerNotifications(rows){
+  if(!customerNotificationsRoot)return;
+  customerNotificationsRoot.replaceChildren();
+  if(!rows.length){customerNotificationsRoot.append(el("p","my-orders-empty","You are all caught up. Order and delivery updates will appear here."));return;}
+  rows.forEach(row=>{
+    const card=el("article","customer-notification"+(row.is_read?"":" unread"));
+    const head=el("div","customer-notification-head");
+    head.append(el("strong","",row.title||"Update"),el("small","",new Date(row.created_at).toLocaleString()));
+    card.append(head,el("p","",row.body||"You have a new update."));
+    if(row.order_id){const link=el("button","notification-order-link","View order");link.type="button";link.onclick=()=>showCustomerTab("orders");card.append(link);}
+    if(!row.is_read){const read=el("button","notification-read","Mark as read");read.type="button";read.onclick=async()=>{const {error}=await db.from("notifications").update({is_read:true}).eq("id",row.id).eq("user_id",(await db.auth.getUser()).data.user.id);if(error){customerNotificationsRoot.prepend(el("p","my-orders-empty","Could not update notification: "+error.message));return;}loadCustomerNotifications();};card.append(read);}
+    customerNotificationsRoot.append(card);
+  });
+}
+async function loadCustomerNotifications(){
+  if(!customerNotificationsRoot)return;
+  const {data:{user}}=await db.auth.getUser();
+  if(!user||user.is_anonymous){customerNotificationsRoot.replaceChildren(el("p","my-orders-empty","Log in to view notifications."));return;}
+  const {data,error}=await db.from("notifications").select("id,title,body,order_id,is_read,created_at").eq("user_id",user.id).order("created_at",{ascending:false}).limit(50);
+  if(error){customerNotificationsRoot.replaceChildren(el("p","my-orders-empty","Notifications could not be loaded: "+error.message));return;}
+  renderCustomerNotifications(data||[]);
+  const unread=(data||[]).filter(x=>!x.is_read).length;
+  const badge=document.getElementById("customer-notification-count");
+  if(badge){badge.textContent=String(unread);badge.hidden=unread===0;}
+}
+async function enableCustomerAlerts(){
+  if(!("Notification" in window)){customerAuthMessage("This browser does not support browser notifications.",true);return;}
+  const permission=await Notification.requestPermission();
+  customerAuthMessage(permission==="granted"?"Browser alerts enabled while the website is open. Background push setup is not active yet.": "Notification permission was not granted.",permission!=="granted");
+}
+function startCustomerNotificationFeed(userId){
+  if(customerNotificationChannel)db.removeChannel(customerNotificationChannel);
+  customerNotificationChannel=db.channel("customer-notifications-"+userId)
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"notifications",filter:"user_id=eq."+userId},payload=>{
+      const n=payload.new||{};
+      if(document.visibilityState==="visible"&&"Notification" in window&&Notification.permission==="granted"){
+        try{new Notification(n.title||"Hurmat Darbar update",{body:n.body||"You have a new order update.",icon:"./assets/hurmat-logo-repo.png"});}catch{}
+      }
+      loadCustomerNotifications();
+    }).subscribe();
+  loadCustomerNotifications();
+}
 function updateCustomerDashboard(signedIn){
   const nav=document.getElementById("customer-bottom-nav");
   const auth=document.getElementById("customer-auth-form");
@@ -368,7 +412,7 @@ function updateCustomerDashboard(signedIn){
   else if(!document.querySelector("[data-customer-tab].active"))showCustomerTab("profile");
 }
 function showCustomerTab(tab){
-  const menu=document.getElementById("menu"), services=document.getElementById("services"), account=document.getElementById("my-account"), orders=document.getElementById("my-orders"), visit=document.getElementById("visit");
+  const menu=document.getElementById("menu"), services=document.getElementById("services"), account=document.getElementById("my-account"), orders=document.getElementById("my-orders"), visit=document.getElementById("visit"), notifications=document.getElementById("customer-notifications");
   const auth=document.getElementById("customer-auth-form"), profile=document.getElementById("customer-profile-card");
   if(auth)auth.hidden=document.body.classList.contains("customer-authenticated");
   if(profile)profile.hidden=tab!=="profile";
@@ -377,9 +421,13 @@ function showCustomerTab(tab){
   if(account)account.hidden=tab!=="profile";
   if(orders)orders.hidden=tab!=="orders";
   if(visit)visit.hidden=tab!=="menu";
+  if(notifications)notifications.hidden=tab!=="notifications";
+  if(tab==="notifications")loadCustomerNotifications();
   document.querySelectorAll("[data-customer-tab]").forEach(b=>b.classList.toggle("active",b.dataset.customerTab===tab));
   window.scrollTo({top:0,behavior:"smooth"});
 }
+const alertsButton=document.getElementById("enable-customer-alerts");
+if(alertsButton)alertsButton.addEventListener("click",enableCustomerAlerts);
 const customerNav=document.getElementById("customer-bottom-nav");
 if(customerNav)customerNav.addEventListener("click",e=>{const b=e.target.closest("[data-customer-tab]");if(b)showCustomerTab(b.dataset.customerTab);});
 const customerAuthForm=document.getElementById("customer-auth-form");
@@ -410,7 +458,8 @@ db.auth.onAuthStateChange((event,session)=>{
   if(nextUserId!==activeCustomerUserId){
     activeCustomerUserId=nextUserId;
     resetCustomerOrders(signedIn?"Loading your orders…":"Log in to see your orders.");
-    if(signedIn)Promise.resolve().then(()=>loadMyOrders(nextUserId));
+    if(signedIn)Promise.resolve().then(()=>{loadMyOrders(nextUserId);loadCustomerProfile();startCustomerNotificationFeed(nextUserId);});
+    else if(customerNotificationChannel){db.removeChannel(customerNotificationChannel);customerNotificationChannel=null;}
   }
 });
 // Keep the page locked until Supabase confirms a registered customer session.
@@ -430,7 +479,7 @@ function setCustomerAuthMode(mode){
   const passwordInput=document.getElementById("account-password");
   passwordInput.autocomplete=signup?"new-password":"current-password";
   // Existing accounts may have passwords shorter than the newer signup policy.
-  passwordInput.minLength=signup?10:8;
+  passwordInput.minLength=signup?10:0;
   passwordInput.placeholder=signup?"10+ chars with uppercase, lowercase, number and symbol":"Enter your account password";
   document.getElementById("customer-auth-submit").textContent=signup?"Create account":"Log in";
   document.getElementById("customer-auth-switch").textContent=signup?"Already have an account? Log in":"New here? Create an account";
@@ -458,7 +507,7 @@ if(customerAuthForm){
     if(customerAuthMode==="signup"&&name.length<2){customerAuthMessage("Enter your full name.",true);return;}
     if(customerAuthMode==="signup"&&(password.length<10||!/[a-z]/.test(password)||!/[A-Z]/.test(password)||!/[0-9]/.test(password)||!/[^A-Za-z0-9]/.test(password))){customerAuthMessage("Use 10+ characters with uppercase, lowercase, a number and a symbol.",true);return;}
     if(!email||!document.getElementById("account-email").checkValidity()){customerAuthMessage("Enter a valid email address.",true);return;}
-    if(password.length<(customerAuthMode==="signup"?10:8)){customerAuthMessage(customerAuthMode==="signup"?"Signup password must be at least 10 characters.":"Password must be at least 8 characters.",true);return;}
+    if(customerAuthMode==="signup"&&password.length<10){customerAuthMessage("Signup password must be at least 10 characters.",true);return;}
     button.disabled=true;button.textContent=customerAuthMode==="signup"?"Creating account…":"Logging in…";
     try{
       if(customerAuthMode==="signup"){
@@ -481,7 +530,7 @@ if(customerAuthForm){
         if(!data.user||data.user.is_anonymous)throw new Error("A registered customer account is required.");
         customerAuthMessage("You are logged in.");
       }
-      await applyCustomerGate();await loadCustomerProfile();await loadMyOrders();showCustomerTab("profile");
+      await applyCustomerGate();await loadCustomerProfile();await loadMyOrders();const {data:{user:activeUser}}=await db.auth.getUser();if(activeUser)startCustomerNotificationFeed(activeUser.id);showCustomerTab("profile");
     }catch(error){customerAuthMessage(error.message||"Account action failed.",true);}
     finally{button.disabled=false;button.textContent=customerAuthMode==="signup"?"Create account":"Log in";}
   });
