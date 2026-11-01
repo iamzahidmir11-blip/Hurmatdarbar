@@ -233,8 +233,35 @@ function refundsView(){
     (r.status==="processing"?'<div class="actions"><button class="btn sm" data-refund="'+esc(r.id)+'" data-refund-status="completed">Mark refunded</button></div>':'')+
     '</article>').join("")||empty("No refund requests yet."))+'</section>';
 }
+const OWNER_VAPID_PUBLIC_KEY="BIVTMUyOjw9WqTLz6pXy84FmsgnjTvU0gF0u7ve64qGR0_355CLatQExhK5l_v-j0ISvFzKF8GlUw4uQvhDZ5Nk";
+function ownerBase64ToBytes(value){const padding="=".repeat((4-value.length%4)%4);const raw=atob((value+padding).replace(/-/g,"+").replace(/_/g,"/"));return Uint8Array.from(raw,c=>c.charCodeAt(0));}
+async function ownerPushState(){
+ const enable=document.getElementById("owner-push-enable"),disable=document.getElementById("owner-push-disable");
+ if(!enable||!("serviceWorker" in navigator))return;
+ try{const reg=await navigator.serviceWorker.ready,sub=await reg.pushManager.getSubscription();enable.textContent=sub?"Push notifications enabled":"Enable push on this device";if(disable)disable.hidden=!sub;}catch{if(disable)disable.hidden=true;}
+}
+async function enableOwnerPush(){
+ try{
+  if(!("Notification" in window)||!("PushManager" in window)||!("serviceWorker" in navigator))throw new Error("This browser does not support push notifications. Use Chrome on Android.");
+  const {data:{user:current}}=await supabase.auth.getUser();if(!current)throw new Error("Sign in first.");
+  const permission=await Notification.requestPermission();if(permission!=="granted")throw new Error("Notification permission was not granted.");
+  const reg=await navigator.serviceWorker.ready;let sub=await reg.pushManager.getSubscription();
+  if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:ownerBase64ToBytes(OWNER_VAPID_PUBLIC_KEY)});
+  const data=sub.toJSON();if(!data.endpoint||!data.keys?.p256dh||!data.keys?.auth)throw new Error("Browser returned an incomplete push subscription.");
+  const {error}=await supabase.from("push_subscriptions").upsert({user_id:current.id,endpoint:data.endpoint,p256dh:data.keys.p256dh,auth:data.keys.auth,user_agent:navigator.userAgent,updated_at:new Date().toISOString()},{onConflict:"user_id,endpoint"});
+  if(error)throw error;toast("Owner/staff push notifications enabled on this device.");await ownerPushState();
+ }catch(error){toast(error.message||"Could not enable push notifications.",true);}
+}
+async function disableOwnerPush(){
+ try{
+  const {data:{user:current}}=await supabase.auth.getUser();const reg=await navigator.serviceWorker.ready,sub=await reg.pushManager.getSubscription();
+  if(sub){const {error}=await supabase.from("push_subscriptions").delete().eq("user_id",current.id).eq("endpoint",sub.endpoint);if(error)throw error;await sub.unsubscribe();}
+  toast("Push notifications disabled on this device.");await ownerPushState();
+ }catch(error){toast(error.message||"Could not disable push notifications.",true);}
+}
 function alertsView(){
-  return notifications.map(n=>'<div class="item-row"><div class="item-meta"><b>'+esc(n.title)+'</b><span class="mute">'+esc(n.body||"")+'</span><span class="mute">'+new Date(n.created_at).toLocaleString()+'</span></div>'+(n.is_read?"":'<button class="btn ghost sm" data-read="'+esc(n.id)+'">Mark read</button>')+'</div>').join("")||empty("No notifications yet.");
+  return '<section class="card" style="margin-bottom:14px"><b>Push notifications on this device</b><p class="mute" style="margin:6px 0 12px">Receive new orders, delivery checks, payment and refund alerts even when this dashboard is closed.</p><div class="actions"><button class="btn sm" id="owner-push-enable" type="button">Enable push on this device</button><button class="btn ghost sm" id="owner-push-disable" type="button" hidden>Disable on this device</button></div></section>'+
+  (notifications.map(n=>'<div class="item-row"><div class="item-meta"><b>'+esc(n.title)+'</b><span class="mute">'+esc(n.body||"")+'</span><span class="mute">'+new Date(n.created_at).toLocaleString()+'</span></div>'+(n.is_read?"":'<button class="btn ghost sm" data-read="'+esc(n.id)+'">Mark read</button>')+'</div>').join("")||empty("No notifications yet."));
 }
 function settingsView(){
   const s=settings||{};
@@ -463,7 +490,7 @@ function bindActions(){
   document.querySelectorAll("[data-reservation]").forEach(b=>b.onclick=async()=>{
     try{await api("",{action:"update_reservation_status",reservation_id:b.dataset.reservation,status:b.dataset.resStatus});await refresh();toast("Reservation updated.");}catch(e){toast(e.message,true);}
   });
-  document.querySelectorAll("[data-read]").forEach(b=>b.onclick=async()=>{
+  const ownerPushEnable=document.getElementById("owner-push-enable");if(ownerPushEnable)ownerPushEnable.onclick=enableOwnerPush;\n  const ownerPushDisable=document.getElementById("owner-push-disable");if(ownerPushDisable)ownerPushDisable.onclick=disableOwnerPush;\n  ownerPushState();\n  document.querySelectorAll("[data-read]").forEach(b=>b.onclick=async()=>{
     const {error}=await supabase.from("notifications").update({is_read:true}).eq("id",b.dataset.read);if(error){toast(error.message,true);return;}await refresh();
   });
   const ownerInviteForm=document.getElementById("owner-invite-form");
