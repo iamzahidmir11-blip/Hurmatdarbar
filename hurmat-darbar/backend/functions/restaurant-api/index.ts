@@ -486,6 +486,9 @@ Deno.serve(async (req: Request) => {
       }
 
       case "create_order": {
+        if (!body.order || typeof body.order !== "object" || body.order.payment_method !== "upi_manual") {
+          return reply({ error: "cash_on_delivery_disabled" }, 403);
+        }
         const { data, error } = await supabase.rpc("create_order_after_availability", { p: body.order });
         if (error) return reply({ error: "order_creation_failed", code: error.message }, 400);
         return reply({ order: data }, 201);

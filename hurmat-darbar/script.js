@@ -37,7 +37,7 @@ function render(){
     const foot=el("div","food-bottom"),price=el("div","price-stack",money(x.menu_variants[0].price));
     price.append(el("small","","Selected price"));
     const add=el("button","add-btn card-add","Add to bag");
-    add.type="button";const stockLeft=Number(x.stock_qty||0),stockTracked=x.track_stock===true,canBuy=x.available!==false&&(!stockTracked||stockLeft>0);add.disabled=!canBuy;
+    add.type="button";const stockLeft=Number(x.stock_qty||0),stockTracked=x.track_stock===true,canBuy=x.available!==false&&x.needs_verification!==true&&(!stockTracked||stockLeft>0);add.disabled=!canBuy;
     const controls=el("div","menu-qty-control"),minus=el("button","qty-minus","−"),qty=el("span","qty-value","0"),plus=el("button","qty-plus","+");
     minus.type=plus.type="button";plus.disabled=!canBuy;
     const sync=()=>{
@@ -84,7 +84,7 @@ function renderCart(){
   if(mobileTotal)mobileTotal.textContent=money(subtotal+(cart.length?Number(restaurantSettings?.delivery_fee??30):0));
   if(mobileCart)mobileCart.hidden=count===0;
   const headerCount=document.getElementById("cart-header-count");if(headerCount)headerCount.textContent=count+" "+(count===1?"item":"items");
-  const checkout=document.getElementById("checkout");if(checkout&&!placingOrder)checkout.disabled=!cart.length||!restaurantSettings?.is_open||!restaurantSettings?.location_verified||!(restaurantSettings?.cod_enabled||(restaurantSettings?.upi_enabled&&restaurantSettings?.upi_id));
+  const checkout=document.getElementById("checkout");if(checkout&&!placingOrder)checkout.disabled=!cart.length||!restaurantSettings?.is_open||!restaurantSettings?.location_verified||!(restaurantSettings?.upi_enabled&&restaurantSettings?.upi_id);
 }
 function qtyChange(key,d){const x=cart.find(x=>x.key===key);if(!x)return;const item=items.find(i=>i.id===x.item_id),limit=item?.track_stock===true?Number(item.stock_qty||0):50;if(d>0&&Number(x.qty)>=Math.min(50,limit)){alert("Stock limit reached for this product.");return}x.qty=Math.max(0,Math.min(50,Number(x.qty)+d));if(x.qty===0)cart=cart.filter(x=>x.key!==key);save();render()}
 const paymentLabel=el("label","payment-label","Payment method");
@@ -172,13 +172,10 @@ function updatePaymentInfo(){
       window.location.href="upi://pay?"+params.toString();
     };
     paymentInfo.append(copy,open);paymentInfo.hidden=false;
-  }else if(method==="cod"){
-    paymentInfo.textContent="Cash on delivery selected.";paymentInfo.hidden=false;
   }else paymentInfo.hidden=true;
 }
 function checkoutState(){
   const methods=[];
-  if(restaurantSettings?.cod_enabled)methods.push({value:"cod",label:"Cash on delivery"});
   if(restaurantSettings?.upi_enabled&&restaurantSettings?.upi_id)methods.push({value:"upi_manual",label:"Manual UPI (staff verifies payment)"});
   const previous=paymentSelect.value;
   paymentSelect.replaceChildren();
@@ -247,7 +244,12 @@ async function pollAvailabilityStatus(){
     checkoutState();
     setTimeout(()=>{if(id===availabilityRequestId)pollAvailabilityStatus()},5000);
   }catch(error){
-    availabilityPolling=false;availabilityMessage="Waiting for Owner response. Connection will retry automatically.";
+    availabilityPolling=false;
+    if(String(error?.message||error).toLowerCase().includes("request_not_found")){
+      clearAvailability("Your previous delivery request is no longer available. Please check delivery availability again.");
+      return;
+    }
+    availabilityMessage="Waiting for Owner response. Connection will retry automatically.";
     checkoutState();
     setTimeout(()=>{if(id===availabilityRequestId)pollAvailabilityStatus()},7000);
   }
@@ -271,6 +273,7 @@ async function placeApprovedOrder(){
   availabilityPayload.idempotency_key=idempotencyKey;
   localStorage.setItem("hd-availability-payload",JSON.stringify(availabilityPayload));
   const method=paymentSelect.value;
+  if(method!=="upi_manual")throw new Error("Cash on delivery is disabled. Please use online UPI payment.");
   const reference=paymentRefInput.value.trim();
   const proofFile=paymentShotInput.files?.[0]||null;
   if(method==="upi_manual"){
@@ -328,7 +331,7 @@ async function load(){
   status.textContent="Loading live menu and restaurant settings…";
   const [a,b,c]=await Promise.all([
     db.from("menu_categories").select("id,name,sort_order").eq("active",true).order("sort_order"),
-    db.from("menu_items").select("id,category_id,name,description,image_url,is_veg,available,track_stock,stock_qty,sort_order,menu_categories(name),menu_variants(id,label,price,sort_order,active)").eq("active",true).order("sort_order"),
+    db.from("menu_items").select("id,category_id,name,description,image_url,is_veg,available,needs_verification,track_stock,stock_qty,sort_order,menu_categories(name),menu_variants(id,label,price,sort_order,active)").eq("active",true).order("sort_order"),
     db.from("restaurant_settings").select("name,is_open,location_verified,lat,lng,delivery_fee,min_order,cod_enabled,upi_enabled,upi_id").eq("id",1).single()
   ]);
   if(a.error||b.error){status.textContent="Menu unavailable. Please call +91 97971 51590.";return;}
