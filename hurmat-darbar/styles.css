@@ -1189,3 +1189,19 @@ body.customer-authenticated main>section[hidden]{display:none!important}
 body.customer-authenticated footer{padding-bottom:105px}
 body.customer-authenticated #my-account{padding-bottom:130px!important}
 @media(min-width:760px){.customer-bottom-nav{bottom:20px}}
+
+
+/* Clear, clickable customer auth mode switch */
+body.customer-locked #my-account #customer-auth-form #customer-auth-switch{
+  display:flex!important;position:relative!important;z-index:2!important;
+  pointer-events:auto!important;cursor:pointer!important;
+  color:#111!important;background:#f1efe9!important;
+  border:1px solid #292720!important;font-weight:800!important;
+  opacity:1!important;text-decoration:none!important;
+}
+body.customer-locked #my-account #customer-auth-form #customer-auth-switch:focus-visible{
+  outline:3px solid #b58a4b!important;outline-offset:3px!important;
+}
+body.customer-locked #my-account #customer-auth-form #customer-auth-submit{
+  position:relative!important;z-index:2!important;pointer-events:auto!important;
+}
