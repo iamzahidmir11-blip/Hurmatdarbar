@@ -18,7 +18,7 @@ const statusNames = {
 const tabs = [["home","⌂","Dashboard"],["orders","▤","Orders"],["tracking","⌖","Live"],["riders","♧","Riders"],["profile","♙","Profile"],["menu","▦","Menu"],["inventory","▣","Inventory"],["availability","✓","Delivery checks"],["payments","₹","Payments"],["refunds","↩","Refunds"],["reservations","◷","Bookings"],["reports","▥","Reports"],["settings","⚙","Store setup"],["alerts","♢","Alerts"]];
 // Temporary development-only UI preview. Live data and all write operations remain protected.
 const DEVELOPMENT_PREVIEW = false;
-let user=null, role=null, page="home", orders=[], menuItems=[], menuCategories=[], reservations=[], riders=[], riderLocations=[], notifications=[], availabilityRequests=[], cashCollections=[], availabilityLoadError="", payments=[], refunds=[], settings=null, channel=null, busy=false, availabilityRefreshTimer=null;
+let user=null, role=null, page="home", orders=[], menuItems=[], menuCategories=[], reservations=[], riders=[], riderLocations=[], notifications=[], availabilityRequests=[], cashCollections=[], availabilityLoadError="", menuLoadError="", payments=[], refunds=[], settings=null, channel=null, busy=false, availabilityRefreshTimer=null;
 
 function toast(message, bad=false){
   let el=document.getElementById("admin-toast");
@@ -160,7 +160,7 @@ function menuView(){
     return '<article class="store-product" data-product-card data-name="'+esc((i.name+" "+(i.description||"")+" "+(i.menu_categories?.name||"")).toLowerCase())+'" data-published="'+String(i.active)+'" data-tracked="'+String(i.track_stock)+'" data-stock-value="'+stock+'"><div class="store-product-photo">'+photo+foodType+'<span class="store-publish-tag '+(i.active?'published':'hidden')+'">'+(i.active?'PUBLISHED':'HIDDEN')+'</span></div><div class="store-product-info"><div class="store-product-heading"><div><small>'+esc(i.menu_categories?.name||"Uncategorised")+'</small><h3>'+esc(i.name)+'</h3></div><b class="store-product-price">'+money(Math.min(...(i.menu_variants||[]).filter(v=>v.active&&v.price!==null).map(v=>Number(v.price)).concat([0]).filter(n=>n>0))||0)+'</b></div><p>'+esc(i.description||"No product description added.")+'</p>'+stockBlock+'<div class="store-variants"><div class="store-section-label">PORTIONS & PRICING</div>'+(variants||'<small>No variants configured.</small>')+'</div><div class="store-product-actions"><button class="btn ghost sm" data-upload-image="'+esc(i.id)+'">Photo</button><button class="btn ghost sm" data-edit-item="'+esc(i.id)+'">Edit</button><button class="btn ghost sm" data-add-variant="'+esc(i.id)+'">+ Variant</button><button class="btn ghost sm" data-toggle="'+esc(i.id)+'" data-available="'+String(i.available)+'">'+(i.available?'Pause item':'Enable item')+'</button><button class="btn sm" data-publish="'+esc(i.id)+'" data-active="'+String(i.active)+'">'+(i.active?'Hide':'Publish')+'</button></div></div></article>';
   }).join("");
   const catCards=menuCategories.map(c=>'<span class="store-category-chip">'+esc(c.name)+'</span>').join("");
-  return '<section class="menu-summary"><div><span class="eyebrow">CUSTOMER CATALOGUE</span><h2>Menu management</h2><p>Changes to items, prices, photos and availability sync to the live customer website.</p></div><div class="store-metrics"><div><small>MENU ITEMS</small><b>'+menuItems.length+'</b></div><div><small>LIVE</small><b>'+menuItems.filter(i=>i.active&&i.available).length+'</b></div><div><small>HIDDEN / PAUSED</small><b>'+menuItems.filter(i=>!i.active||!i.available).length+'</b></div><div><small>CATEGORIES</small><b>'+menuCategories.length+'</b></div></div></section>'+search+'<div class="store-category-list">'+catCards+'</div><div class="store-product-grid" id="store-product-grid">'+(cards||empty("No menu items yet. Add your first dish."))+'</div>';
+  return (menuLoadError?'<div class="notice error">Menu items could not be loaded: '+esc(menuLoadError)+'</div>':"")+'<section class="menu-summary"><div><span class="eyebrow">CUSTOMER CATALOGUE</span><h2>Menu management</h2><p>Changes to items, prices, photos and availability sync to the live customer website.</p></div><div class="store-metrics"><div><small>MENU ITEMS</small><b>'+menuItems.length+'</b></div><div><small>LIVE</small><b>'+menuItems.filter(i=>i.active&&i.available).length+'</b></div><div><small>HIDDEN / PAUSED</small><b>'+menuItems.filter(i=>!i.active||!i.available).length+'</b></div><div><small>CATEGORIES</small><b>'+menuCategories.length+'</b></div></div></section>'+search+'<div class="store-category-list">'+catCards+'</div><div class="store-product-grid" id="store-product-grid">'+(cards||empty("No menu items yet. Add your first dish."))+'</div>';
 }
 function inventoryView(){
   const tracked=menuItems.filter(i=>i.track_stock),untracked=menuItems.filter(i=>!i.track_stock);
@@ -325,7 +325,16 @@ async function refresh(){
     ["owner","manager","delivery_manager"].includes(role)?api("cash_collections"):Promise.resolve({cash_collections:[]}),
     (role==="owner"||role==="manager")?api("payments"):Promise.resolve({payments:[]}),(role==="owner"||role==="manager")?api("refunds"):Promise.resolve({refunds:[]})]);
   if(results[0].status==="fulfilled")orders=results[0].value.orders||[];
+  menuLoadError="";
   if(results[1].status==="fulfilled")menuItems=results[1].value.items||[];
+  else menuLoadError=results[1].reason?.message||"Menu API unavailable.";
+  if(!menuItems.length){
+    const directMenu=await supabase.from("menu_items")
+      .select("id,category_id,name,description,image_url,is_veg,active,available,needs_verification,track_stock,stock_qty,menu_categories(name),menu_variants(id,label,price,active)")
+      .order("name",{ascending:true}).limit(300);
+    if(!directMenu.error&&directMenu.data?.length){menuItems=directMenu.data;menuLoadError="";}
+    else if(directMenu.error)menuLoadError=directMenu.error.message||menuLoadError||"Menu items could not be loaded.";
+  }
   if(results[2].status==="fulfilled")reservations=results[2].value.reservations||[];
   if(results[3].status==="fulfilled"){riders=results[3].value.riders||[];riderLocations=results[3].value.locations||[];}
   if(results[4].status==="fulfilled"&&!results[4].value.error)notifications=results[4].value.data||[];
