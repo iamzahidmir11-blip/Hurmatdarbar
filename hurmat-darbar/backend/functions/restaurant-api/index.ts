@@ -316,6 +316,69 @@ Deno.serve(async (req: Request) => {
         if (error) return reply({ error: "reservation_update_failed" }, 400);
         return reply({ ok: true });
       }
+      case "create_rider_account": {
+        if (!roles.has("owner")) return reply({ error: "forbidden" }, 403);
+        const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+        const password = typeof body.password === "string" ? body.password : "";
+        const name = typeof body.name === "string" ? body.name.trim() : "";
+        const phone = typeof body.phone === "string" ? body.phone.trim() : "";
+        if (email.length > 254 || email.includes(" ") || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+          return reply({ error: "invalid_rider_email" }, 400);
+        }
+        if (name.length < 2 || name.length > 80 || phone.length < 7 || phone.length > 20) {
+          return reply({ error: "invalid_rider_profile" }, 400);
+        }
+        if (password.length < 10 || password.length > 128 ||
+            !/[a-z]/.test(password) || !/[A-Z]/.test(password) ||
+            !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+          return reply({ error: "weak_rider_password" }, 400);
+        }
+        const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+        if (!serviceRoleKey) return reply({ error: "rider_accounts_not_configured" }, 503);
+        const adminClient = createClient(url, serviceRoleKey, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        });
+        const { data: created, error: createError } = await adminClient.auth.admin.createUser({
+          email, password, email_confirm: true,
+          user_metadata: { full_name: name, phone, account_created_by: "hurmat_owner_dashboard" },
+        });
+        if (createError) {
+          const msg = createError.message.toLowerCase();
+          return reply({
+            error: msg.includes("already") || msg.includes("registered")
+              ? "rider_email_already_registered"
+              : "rider_account_creation_failed",
+          }, 400);
+        }
+        const riderUser = created?.user;
+        if (!riderUser?.id) return reply({ error: "rider_account_creation_failed" }, 500);
+
+        const { error: roleError } = await adminClient.from("user_roles").upsert(
+          { user_id: riderUser.id, role: "rider", active: true },
+          { onConflict: "user_id,role" },
+        );
+        if (roleError) {
+          await adminClient.auth.admin.deleteUser(riderUser.id);
+          return reply({ error: "rider_role_activation_failed" }, 500);
+        }
+
+        const { error: riderError } = await adminClient.from("riders").upsert(
+          { user_id: riderUser.id, name, phone, is_online: false },
+          { onConflict: "user_id" },
+        );
+        if (riderError) {
+          await adminClient.from("user_roles").delete().eq("user_id", riderUser.id).eq("role", "rider");
+          await adminClient.auth.admin.deleteUser(riderUser.id);
+          return reply({ error: "rider_profile_creation_failed" }, 500);
+        }
+
+        await adminClient.from("audit_logs").insert({
+          actor: user.id, action: "rider_account_created", entity: "user",
+          entity_id: riderUser.id, details: { role: "rider", email },
+        });
+        return reply({ ok: true, user_id: riderUser.id, role: "rider", active: true }, 201);
+      }
+
       case "create_staff_account": {
         if (!roles.has("owner")) return reply({ error: "forbidden" }, 403);
         const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
