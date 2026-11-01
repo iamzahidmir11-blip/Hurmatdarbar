@@ -384,10 +384,60 @@ async function loadCustomerNotifications(){
   const badge=document.getElementById("customer-notification-count");
   if(badge){badge.textContent=String(unread);badge.hidden=unread===0;}
 }
+const CUSTOMER_VAPID_PUBLIC_KEY="BIVTMUyOjw9WqTLz6pXy84FmsgnjTvU0gF0u7ve64qGR0_355CLatQExhK5l_v-j0ISvFzKF8GlUw4uQvhDZ5Nk";
+function urlBase64ToUint8Array(value){
+  const padding="=".repeat((4-value.length%4)%4);
+  const raw=atob((value+padding).replace(/-/g,"+").replace(/_/g,"/"));
+  return Uint8Array.from(raw,c=>c.charCodeAt(0));
+}
+async function refreshCustomerPushControls(){
+  const enable=document.getElementById("enable-customer-alerts");
+  const disable=document.getElementById("disable-customer-alerts");
+  if(!enable||!("serviceWorker" in navigator))return;
+  try{
+    const registration=await navigator.serviceWorker.ready;
+    const subscription=await registration.pushManager.getSubscription();
+    enable.textContent=subscription?"Push notifications enabled":"Enable push notifications";
+    if(disable)disable.hidden=!subscription;
+  }catch{if(disable)disable.hidden=true;}
+}
 async function enableCustomerAlerts(){
-  if(!("Notification" in window)){customerAuthMessage("This browser does not support browser notifications.",true);return;}
-  const permission=await Notification.requestPermission();
-  customerAuthMessage(permission==="granted"?"Browser alerts enabled while the website is open. Background push setup is not active yet.": "Notification permission was not granted.",permission!=="granted");
+  try{
+    const {data:{user}}=await db.auth.getUser();
+    if(!user||user.is_anonymous){customerAuthMessage("Please log in before enabling push notifications.",true);return;}
+    if(!("Notification" in window)||!("PushManager" in window)||!("serviceWorker" in navigator)){
+      customerAuthMessage("Push notifications are not supported in this browser. Try Chrome on Android.",true);return;
+    }
+    const permission=await Notification.requestPermission();
+    if(permission!=="granted"){customerAuthMessage("Notification permission was not granted. Enable it in your browser site settings.",true);return;}
+    const registration=await navigator.serviceWorker.ready;
+    let subscription=await registration.pushManager.getSubscription();
+    if(!subscription)subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(CUSTOMER_VAPID_PUBLIC_KEY)});
+    const json=subscription.toJSON();
+    if(!json.endpoint||!json.keys?.p256dh||!json.keys?.auth)throw new Error("Browser did not return a complete push subscription.");
+    const {error}=await db.from("push_subscriptions").upsert({
+      user_id:user.id,endpoint:json.endpoint,p256dh:json.keys.p256dh,auth:json.keys.auth,
+      user_agent:navigator.userAgent,updated_at:new Date().toISOString()
+    },{onConflict:"user_id,endpoint"});
+    if(error)throw error;
+    customerAuthMessage("Push notifications enabled. You can now receive order updates even when the website is closed.");
+    await refreshCustomerPushControls();
+  }catch(error){customerAuthMessage(error.message||"Could not enable push notifications.",true);}
+}
+async function disableCustomerAlerts(){
+  try{
+    const {data:{user}}=await db.auth.getUser();
+    const registration=await navigator.serviceWorker.ready;
+    const subscription=await registration.pushManager.getSubscription();
+    if(subscription){
+      const endpoint=subscription.endpoint;
+      const {error}=await db.from("push_subscriptions").delete().eq("user_id",user.id).eq("endpoint",endpoint);
+      if(error)throw error;
+      await subscription.unsubscribe();
+    }
+    customerAuthMessage("Push notifications have been disabled for this device.");
+    await refreshCustomerPushControls();
+  }catch(error){customerAuthMessage(error.message||"Could not disable push notifications.",true);}
 }
 function startCustomerNotificationFeed(userId){
   if(customerNotificationChannel)db.removeChannel(customerNotificationChannel);
@@ -427,7 +477,7 @@ function showCustomerTab(tab){
   window.scrollTo({top:0,behavior:"smooth"});
 }
 const alertsButton=document.getElementById("enable-customer-alerts");
-if(alertsButton)alertsButton.addEventListener("click",enableCustomerAlerts);
+if(alertsButton)alertsButton.addEventListener("click",enableCustomerAlerts);\nconst disableAlertsButton=document.getElementById("disable-customer-alerts");\nif(disableAlertsButton)disableAlertsButton.addEventListener("click",disableCustomerAlerts);\nrefreshCustomerPushControls();
 const customerNav=document.getElementById("customer-bottom-nav");
 if(customerNav)customerNav.addEventListener("click",e=>{const b=e.target.closest("[data-customer-tab]");if(b)showCustomerTab(b.dataset.customerTab);});
 const customerAuthForm=document.getElementById("customer-auth-form");
@@ -464,6 +514,15 @@ db.auth.onAuthStateChange((event,session)=>{
 });
 // Keep the page locked until Supabase confirms a registered customer session.
 applyCustomerGate();
+async function requestCustomerPasswordReset(){
+  const email=document.getElementById("account-email").value.trim().toLowerCase();
+  if(!email||!document.getElementById("account-email").checkValidity()){customerAuthMessage("Enter your registered email first, then tap Forgot password.",true);return;}
+  try{
+    const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});
+    if(error)throw error;
+    customerAuthMessage("If this email is registered, a password reset link has been sent. Check your inbox and spam folder.");
+  }catch(error){customerAuthMessage(error.message||"Could not send password reset email.",true);}
+}
 function customerAuthMessage(message,bad=false){
   const node=document.getElementById("customer-auth-message");
   if(node){node.textContent=message;node.style.color=bad?"#a33":"inherit";}
@@ -484,7 +543,7 @@ function setCustomerAuthMode(mode){
   document.getElementById("customer-auth-submit").textContent=signup?"Create account":"Log in";
   document.getElementById("customer-auth-switch").textContent=signup?"Already have an account? Log in":"New here? Create an account";
 }
-if(customerAuthForm){
+const forgotPasswordButton=document.getElementById("customer-forgot-password");\nif(forgotPasswordButton)forgotPasswordButton.addEventListener("click",requestCustomerPasswordReset);\nif(customerAuthForm){
   setCustomerAuthMode("login");
   const authSwitchButton=document.getElementById("customer-auth-switch");
   authSwitchButton.addEventListener("click",event=>{
