@@ -73,30 +73,30 @@ class MainActivity : Activity() {
  }
  private fun rounded(color:Int,radius:Float=18f)=GradientDrawable().apply { setColor(color); cornerRadius=radius }
  private fun setup(title:String) {
-  window.statusBarColor=Color.rgb(7,35,25); window.navigationBarColor=Color.rgb(7,35,25)
-  root=LinearLayout(this).apply {
-   orientation=1; setPadding(18,22,18,32)
-   background=android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,intArrayOf(Color.rgb(7,39,28),Color.rgb(16,62,43),Color.rgb(235,239,231))).apply{cornerRadius=0f}
-  }
-  val hero=LinearLayout(this).apply {
-   orientation=1; gravity=android.view.Gravity.CENTER; setPadding(22,24,22,23)
-   background=android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TL_BR,intArrayOf(Color.rgb(17,75,51),Color.rgb(7,37,27))).apply{cornerRadius=30f;setStroke(1,Color.argb(100,226,199,139))}
-   elevation=12f
-  }
-  val brandRow=LinearLayout(this).apply{orientation=0;gravity=android.view.Gravity.CENTER_VERTICAL}
-  val mark=ImageView(this).apply{setImageResource(com.hurmatdarbar.delivery.R.drawable.ic_hurmat_delivery);scaleType=ImageView.ScaleType.FIT_CENTER}
-  brandRow.addView(mark,LinearLayout.LayoutParams(58,58).apply{rightMargin=13})
+  window.statusBarColor=Color.rgb(7,35,25);window.navigationBarColor=Color.rgb(7,35,25)
+  val shell=LinearLayout(this).apply{orientation=1;setBackgroundColor(paper)}
+  root=LinearLayout(this).apply{orientation=1;setPadding(16,16,16,22);setBackgroundColor(paper)}
+  val hero=LinearLayout(this).apply{orientation=1;setPadding(20,20,20,20);background=GradientDrawable(GradientDrawable.Orientation.TL_BR,intArrayOf(Color.rgb(17,75,51),Color.rgb(7,37,27))).apply{cornerRadius=28f;setStroke(1,Color.argb(100,226,199,139))};elevation=8f}
+  val brand=LinearLayout(this).apply{orientation=0;gravity=android.view.Gravity.CENTER_VERTICAL}
+  val logo=ImageView(this).apply{setImageResource(R.drawable.hurmat_owner_logo);scaleType=ImageView.ScaleType.FIT_CENTER}
+  brand.addView(logo,LinearLayout.LayoutParams(58,58).apply{rightMargin=13})
   val brandText=LinearLayout(this).apply{orientation=1}
-  brandText.addView(TextView(this).apply{text="HURMAT DARBAR";textSize=17f;letterSpacing=1.2f;setTextColor(Color.WHITE);setTypeface(null,Typeface.BOLD)})
-  brandText.addView(TextView(this).apply{text="DELIVERY PARTNER";textSize=9f;letterSpacing=2f;setTextColor(Color.rgb(225,202,151));setPadding(0,5,0,0)})
-  brandRow.addView(brandText);hero.addView(brandRow)
-  hero.addView(TextView(this).apply{text=title;textSize=28f;setTextColor(Color.WHITE);setTypeface(null,Typeface.BOLD);setPadding(0,22,0,5);gravity=android.view.Gravity.CENTER})
-  hero.addView(TextView(this).apply{text="Every order. Every mile. With care.";textSize=12f;setTextColor(Color.rgb(214,229,217));gravity=android.view.Gravity.CENTER})
-  root.addView(hero,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=17})
-  val statusCard=LinearLayout(this).apply{orientation=1;setPadding(16,12,16,12);background=android.graphics.drawable.GradientDrawable().apply{setColor(Color.argb(232,255,255,255));cornerRadius=18f;setStroke(1,Color.argb(90,255,255,255))};elevation=5f}
-  status=TextView(this).apply{text="●  Connecting to delivery system…";textSize=12f;setTextColor(ink);setPadding(2,2,2,2)}
-  statusCard.addView(status);root.addView(statusCard,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=12})
-  setContentView(ScrollView(this).apply{isFillViewport=true;addView(root)})
+  brandText.addView(TextView(this).apply{text="HURMAT DARBAR";textSize=18f;letterSpacing=1.1f;setTextColor(Color.WHITE);setTypeface(null,Typeface.BOLD)})
+  brandText.addView(TextView(this).apply{text="DELIVERY PARTNER";textSize=10f;letterSpacing=2f;setTextColor(Color.rgb(225,202,151))})
+  brand.addView(brandText);hero.addView(brand)
+  hero.addView(TextView(this).apply{text=title;textSize=27f;setTextColor(Color.WHITE);setTypeface(null,Typeface.BOLD);setPadding(0,18,0,3)})
+  hero.addView(TextView(this).apply{text="Every order. Every mile. With care.";textSize=12f;setTextColor(Color.rgb(214,229,217))})
+  root.addView(hero,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=14})
+  val sc=LinearLayout(this).apply{orientation=1;setPadding(15,12,15,12);background=rounded(Color.WHITE,18f);elevation=3f}
+  status=TextView(this).apply{text="●  Connected to delivery system";textSize=13f;setTextColor(ink)}
+  sc.addView(status);root.addView(sc,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=12})
+  shell.addView(ScrollView(this).apply{isFillViewport=true;addView(root)},LinearLayout.LayoutParams(-1,0,1f))
+  val nav=LinearLayout(this).apply{orientation=0;gravity=android.view.Gravity.CENTER;setPadding(8,7,8,7);setBackgroundColor(forest)}
+  fun navItem(t:String,fn:()->Unit)=TextView(this).apply{text=t;gravity=android.view.Gravity.CENTER;textSize=14f;setTextColor(Color.WHITE);setTypeface(null,Typeface.BOLD);setPadding(8,13,8,13);setOnClickListener{fn()}}
+  nav.addView(navItem("⌂  Home"){home()},LinearLayout.LayoutParams(0,-2,1f))
+  nav.addView(navItem("▤  Orders"){orderFilter="active";orders()},LinearLayout.LayoutParams(0,-2,1f))
+  nav.addView(navItem("●  Profile"){profile()},LinearLayout.LayoutParams(0,-2,1f))
+  shell.addView(nav,LinearLayout.LayoutParams(-1,-2));setContentView(shell)
  }
  private fun label(s:String,size:Float=14f)=TextView(this).apply { text=s; textSize=size; setTextColor(ink); setPadding(0,7,0,7) }
  private fun button(s:String,action:()->Unit)=Button(this).apply {
@@ -142,51 +142,62 @@ class MainActivity : Activity() {
   polling=false
   pollHandler.removeCallbacks(pollTask)
  }
- private fun orders() {
-  startPolling()
+ private fun home() {
   setup("My Deliveries")
-  root.addView(button(if(online) "Go Offline" else "Go Online"){availability(!online)})
-  root.addView(button("Available to pick"){orderFilter="available";orders()})
-  root.addView(button("Pending orders"){orderFilter="pending";orders()})
-  root.addView(button("Active deliveries"){orderFilter="active";orders()})
-  root.addView(button("Delivery history"){orderFilter="history";orders()})
-  root.addView(button("All assigned orders"){orderFilter="all";orders()})
-  root.addView(button("Refresh"){orders()})
-  root.addView(button("Sign Out"){signOutRider()})
-  status.text=if(orderFilter=="available") "Finding pickup-ready orders…" else "Loading assigned orders…"
-  worker.execute { try {
-   val self=request(base+"/functions/v1/restaurant-api?view=rider_self","GET",null,token)
-   online=self.optBoolean("is_online",false)
-   if(online) request(base+"/functions/v1/restaurant-api","POST",JSONObject().put("action","set_rider_availability").put("is_online",true).toString(),token)
-   val endpoint=if(orderFilter=="available") base+"/functions/v1/restaurant-api?view=available_orders" else base+"/functions/v1/restaurant-api"
+  val card=LinearLayout(this).apply{orientation=1;setPadding(16,16,16,16);background=rounded(Color.WHITE,20f);elevation=3f}
+  card.addView(label(if(online)"You are online" else "You are offline",19f))
+  card.addView(label(if(online)"Ready to receive delivery requests" else "Go online to receive new pickup requests",12f))
+  card.addView(button(if(online)"Go Offline" else "Go Online"){availability(!online)})
+  root.addView(card,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=14})
+  root.addView(label("YOUR DELIVERIES",12f))
+  listOf("Available to pick" to "available","Pending orders" to "pending","Active deliveries" to "active","Delivery history" to "history","All assigned orders" to "all").forEach{(t,f)->root.addView(button(t+"  →"){orderFilter=f;orders()},LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=9})}
+  root.addView(button("Refresh orders"){orderFilter="active";orders()})
+ }
+ private fun orders() {
+  startPolling();setup("Orders")
+  root.addView(button(if(online)"Go Offline" else "Go Online"){availability(!online)},LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=10})
+  listOf("Available" to "available","Pending" to "pending","Active" to "active","History" to "history","All" to "all").forEach{(t,f)->root.addView(button((if(orderFilter==f)"✓  " else "")+t){orderFilter=f;orders()},LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=6})}
+  root.addView(button("Refresh"){orders()},LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=8})
+  status.text=if(orderFilter=="available")"Finding pickup-ready orders…" else "Loading assigned orders…"
+  worker.execute{try{
+   val self=request(base+"/functions/v1/restaurant-api?view=rider_self","GET",null,token);online=self.optBoolean("is_online",false)
+   if(online)request(base+"/functions/v1/restaurant-api","POST",JSONObject().put("action","set_rider_availability").put("is_online",true).toString(),token)
+   val endpoint=if(orderFilter=="available")base+"/functions/v1/restaurant-api?view=available_orders" else base+"/functions/v1/restaurant-api"
    val rows=request(endpoint,"GET",null,token).optJSONArray("orders")?:JSONArray()
-   val loaded=(0 until rows.length()).mapNotNull { rows.optJSONObject(it) }
-   val ids=loaded.map { it.optString("id") }.filter { it.isNotBlank() }
-   val newlyAssigned=if(orderFilter=="available"||firstOrdersLoad){if(orderFilter!="available"){firstOrdersLoad=false;knownOrderIds.addAll(ids)};emptyList()}else loaded.filter { !knownOrderIds.contains(it.optString("id")) }
+   val loaded=(0 until rows.length()).mapNotNull{rows.optJSONObject(it)}
+   val ids=loaded.map{it.optString("id")}.filter{it.isNotBlank()}
+   val newly=if(orderFilter=="available"||firstOrdersLoad){if(orderFilter!="available"){firstOrdersLoad=false;knownOrderIds.addAll(ids)};emptyList()}else loaded.filter{!knownOrderIds.contains(it.optString("id"))}
    if(orderFilter!="available")knownOrderIds.addAll(ids)
-   if(newlyAssigned.isNotEmpty()) runOnUiThread {
-    val numbers=newlyAssigned.take(3).joinToString(", ") { "#"+it.optString("order_no") }
-    Toast.makeText(this,"New delivery assigned: "+numbers,Toast.LENGTH_LONG).show()
-   }
-   runOnUiThread {
+   if(newly.isNotEmpty())runOnUiThread{Toast.makeText(this,"New delivery assigned: "+newly.take(3).joinToString(", "){"#"+it.optString("order_no")},Toast.LENGTH_LONG).show()}
+   runOnUiThread{
     if(orderFilter=="available"){
-     status.text=if(!online) "You are offline. Go online to see pickup requests." else loaded.size.toString()+" pickup-ready order(s) available"
+     status.text=if(!online)"You are offline. Go online to see pickup requests." else loaded.size.toString()+" pickup-ready order(s) available"
      if(!online||loaded.isEmpty())root.addView(label(if(!online)"Switch to Online to receive available orders." else "No unassigned pickup-ready orders right now."))
-     loaded.forEach { renderAvailable(it) }
-     return@runOnUiThread
+     loaded.forEach{renderAvailable(it)};return@runOnUiThread
     }
-    val pending=setOf("pending_confirmation","confirmed","preparing")
-    val active=setOf("ready_for_pickup","picked_up","out_for_delivery")
-    val history=setOf("delivered","delivery_failed","cancelled","rejected")
-    val filtered=(0 until rows.length()).mapNotNull { rows.optJSONObject(it) }.filter { order ->
-     val s=order.optString("status")
-     when(orderFilter) { "pending"->s in pending; "history"->s in history; "all"->true; else->s in active }
-    }
+    val pending=setOf("pending_confirmation","confirmed","preparing");val active=setOf("ready_for_pickup","picked_up","out_for_delivery");val history=setOf("delivered","delivery_failed","cancelled","rejected")
+    val filtered=loaded.filter{o->when(orderFilter){"pending"->o.optString("status") in pending;"history"->o.optString("status") in history;"all"->true;else->o.optString("status") in active}}
     status.text=filtered.size.toString()+" order(s) • "+when(orderFilter){"pending"->"Pending";"history"->"History";"all"->"All assigned";else->"Active"}
-    if(filtered.isEmpty()) root.addView(label(when(orderFilter){"pending"->"No pending orders. New assigned orders waiting for restaurant confirmation or preparation will appear here.";"history"->"No completed or failed deliveries in your history.";"all"->"No assigned deliveries. Wait for the manager to assign an order.";else->"No pickup-ready or ongoing deliveries right now. Check Pending orders for earlier stages."}))
-    filtered.forEach { render(it) }
+    if(filtered.isEmpty())root.addView(label(when(orderFilter){"pending"->"No pending orders.";"history"->"No completed or failed deliveries in your history.";"all"->"No assigned deliveries. Wait for the manager to assign an order.";else->"No active deliveries right now."}))
+    filtered.forEach{render(it)}
    }
-  } catch(ex:Exception){runOnUiThread{status.text=message(ex)}} }
+  }catch(ex:Exception){runOnUiThread{status.text=message(ex)}}}
+ }
+ private fun profile() {
+  setup("My Profile");status.text="Loading your rider profile…"
+  worker.execute{try{
+   val self=request(base+"/functions/v1/restaurant-api?view=rider_self","GET",null,token);online=self.optBoolean("is_online",false)
+   runOnUiThread{
+    val card=LinearLayout(this).apply{orientation=1;setPadding(18,18,18,18);background=rounded(Color.WHITE,22f);elevation=4f}
+    card.addView(label(self.optString("name","Delivery Partner"),23f));card.addView(label(self.optString("phone","Phone not added"),15f))
+    card.addView(label("Rider account: Active",13f));card.addView(label(if(online)"Availability: Online" else "Availability: Offline",13f))
+    card.addView(label("Last active: "+self.optString("last_seen","Not available"),11f))
+    root.addView(card,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=14})
+    root.addView(button(if(online)"Go Offline" else "Go Online"){availability(!online)},LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=9})
+    root.addView(button("Refresh profile"){profile()},LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=9})
+    root.addView(button("Sign Out"){signOutRider()});status.text="Profile loaded from delivery system."
+   }
+  }catch(ex:Exception){runOnUiThread{status.text=message(ex)}}}
  }
  private fun renderAvailable(o:JSONObject) {
   val card=LinearLayout(this).apply{orientation=1;setPadding(16,14,16,14);background=android.graphics.drawable.GradientDrawable().apply{setColor(Color.argb(246,255,255,255));cornerRadius=23f;setStroke(1,Color.rgb(222,231,223))};elevation=7f}
