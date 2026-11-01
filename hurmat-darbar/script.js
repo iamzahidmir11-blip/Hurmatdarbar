@@ -84,7 +84,7 @@ function renderCart(){
   if(mobileTotal)mobileTotal.textContent=money(subtotal+(cart.length?Number(restaurantSettings?.delivery_fee??30):0));
   if(mobileCart)mobileCart.hidden=count===0;
   const headerCount=document.getElementById("cart-header-count");if(headerCount)headerCount.textContent=count+" "+(count===1?"item":"items");
-  const checkout=document.getElementById("checkout");if(checkout&&!placingOrder)checkout.disabled=!cart.length||!restaurantSettings?.is_open||!restaurantSettings?.location_verified||!(restaurantSettings?.cod_enabled||(restaurantSettings?.upi_enabled&&restaurantSettings?.upi_id));
+  const checkout=document.getElementById("checkout");if(checkout&&!placingOrder)checkout.disabled=!cart.length||!restaurantSettings?.is_open||!restaurantSettings?.location_verified||!(restaurantSettings?.upi_enabled&&restaurantSettings?.upi_id);
 }
 function qtyChange(key,d){const x=cart.find(x=>x.key===key);if(!x)return;const item=items.find(i=>i.id===x.item_id),limit=item?.track_stock===true?Number(item.stock_qty||0):50;if(d>0&&Number(x.qty)>=Math.min(50,limit)){alert("Stock limit reached for this product.");return}x.qty=Math.max(0,Math.min(50,Number(x.qty)+d));if(x.qty===0)cart=cart.filter(x=>x.key!==key);save();render()}
 const paymentLabel=el("label","payment-label","Payment method");
@@ -172,13 +172,12 @@ function updatePaymentInfo(){
       window.location.href="upi://pay?"+params.toString();
     };
     paymentInfo.append(copy,open);paymentInfo.hidden=false;
-  }else if(method==="cod"){
-    paymentInfo.textContent="Cash on delivery selected.";paymentInfo.hidden=false;
+  }else{
+    paymentInfo.hidden=true;
   }else paymentInfo.hidden=true;
 }
 function checkoutState(){
   const methods=[];
-  if(restaurantSettings?.cod_enabled)methods.push({value:"cod",label:"Cash on delivery"});
   if(restaurantSettings?.upi_enabled&&restaurantSettings?.upi_id)methods.push({value:"upi_manual",label:"Manual UPI (staff verifies payment)"});
   const previous=paymentSelect.value;
   paymentSelect.replaceChildren();
@@ -271,6 +270,7 @@ async function placeApprovedOrder(){
   availabilityPayload.idempotency_key=idempotencyKey;
   localStorage.setItem("hd-availability-payload",JSON.stringify(availabilityPayload));
   const method=paymentSelect.value;
+  if(method!=="upi_manual")throw new Error("Cash on delivery is disabled. Please use online UPI payment.");
   const reference=paymentRefInput.value.trim();
   const proofFile=paymentShotInput.files?.[0]||null;
   if(method==="upi_manual"){
