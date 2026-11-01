@@ -9,7 +9,7 @@ let items=[],cat="all",query="",cart=[],selectedVariants={},restaurantSettings=n
 let availabilityRequestId=localStorage.getItem("hd-availability-request")||"",availabilityPayload=null,availabilityApproved=false,availabilityPolling=false,availabilityMessage="";
 try{availabilityPayload=JSON.parse(localStorage.getItem("hd-availability-payload")||"null")}catch{availabilityPayload=null}try{cart=JSON.parse(localStorage.getItem("hd-cart")||"[]");if(!Array.isArray(cart))cart=[]}catch{cart=[]}
 const money=n=>"₹"+Number(n).toLocaleString("en-IN");
-const isIndianFoodCategory = name => { const key=String(name||"").trim().toLowerCase(); return key.startsWith("indian") || ["wazwan","tandoori","naan and roti","rice"].includes(key); };
+const isIndianVegCategory = name => String(name||"").trim().toLowerCase() === "indian veg";
 
 function el(tag,cls,txt){const n=document.createElement(tag);if(cls)n.className=cls;if(txt!==undefined)n.textContent=txt;return n}
 function toggleCart(on){panel.classList.toggle("open",on);scrim.classList.toggle("open",on)}
@@ -29,7 +29,7 @@ function render(){
     if(imageUrl){image.src=imageUrl;image.onerror=()=>{image.onerror=null;image.remove();photo.classList.add("photo-unavailable");photo.append(el("span","photo-label",x.name));};photo.append(image);}
     else{photo.classList.add("photo-unavailable");photo.append(el("span","photo-label",x.name));}
     const body=el("div","food-body"),title=el("h3","",x.name);
-    if(isIndianFoodCategory(x.category_name)&&typeof x.is_veg==="boolean"){const type=el("span","food-type "+(x.is_veg?"veg":"nonveg"),x.is_veg?"VEG":"NON-VEG");body.append(type)}
+    if(isIndianVegCategory(x.category_name)&&typeof x.is_veg==="boolean"){const type=el("span","food-type "+(x.is_veg?"veg":"nonveg"),x.is_veg?"VEG":"NON-VEG");body.append(type)}
     body.append(title);const description=foodDescription(x);if(description)body.append(el("p","food-description",description));if(x.track_stock===true){const stockNote=el("small","stock-note",Number(x.stock_qty||0)>0?Number(x.stock_qty)+" available":"Out of stock");body.append(stockNote)}
     const select=el("select","variant-select");
     x.menu_variants.forEach((v,n)=>{const opt=document.createElement("option");opt.value=String(n);opt.textContent=v.label+" · "+money(v.price);select.append(opt)});
