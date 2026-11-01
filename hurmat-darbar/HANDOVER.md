@@ -10,14 +10,14 @@ Last updated: 1 November 2026
 
 ## Current verified delivery state
 - Supabase project status: ACTIVE_HEALTHY.
-- `restaurant-api` Edge Function: ACTIVE, version 34.
+- `restaurant-api` Edge Function: ACTIVE, version 35.
 - GitHub Android build passed for the rider and owner debug apps: https://github.com/iamzahidmir11-blip/Hurmatdarbar/actions/runs/41295716774
 - Customer Next.js CI passed: https://github.com/iamzahidmir11-blip/Hurmatdarbar/actions/runs/41295716776
 - Latest website deployment passed: https://github.com/iamzahidmir11-blip/Hurmatdarbar/actions/runs/41296394142
 - Delivery radius is set to the requested 3,000 metres.
 - Stale rider online flags were cleared; rider presence is considered stale after 15 minutes.
 - Role checks now bind the supplied user ID to auth.uid(), preventing role lookups for arbitrary users.
-- Rider app now marks the rider offline during explicit sign-out, refreshes online heartbeat while active, and exposes COD collection after delivery.
+- Rider app now marks the rider offline during explicit sign-out, refreshes online heartbeat while active, and exposes COD collection after delivery. Stale sessions stay offline on rider self-status until the rider explicitly goes online again.
 - Owner dashboard displays stale rider sessions as offline and already has COD cash reconciliation / owner handover confirmation.
 
 ## Application flow
