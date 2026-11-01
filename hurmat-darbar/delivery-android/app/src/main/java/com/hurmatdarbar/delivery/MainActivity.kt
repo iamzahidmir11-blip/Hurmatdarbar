@@ -31,13 +31,14 @@ class MainActivity : Activity() {
  private val pollTask=object:Runnable {
   override fun run() {
    if(token.isNullOrBlank()){polling=false;return}
-   if(!isFinishing && hasWindowFocus()) orders()
+   if(!isFinishing && hasWindowFocus() && currentScreen=="orders") orders()
    pollHandler.postDelayed(this,20000L)
   }
  }
  private var token:String?=null
  private var refreshToken:String?=null
  private var online=false
+ private var currentScreen="orders"
  private var orderFilter="active"
  private var sharingOrderId:String?=null
  private lateinit var root:LinearLayout
@@ -91,7 +92,7 @@ class MainActivity : Activity() {
   status=TextView(this).apply{text="●  Connected to delivery system";textSize=13f;setTextColor(ink)}
   sc.addView(status);root.addView(sc,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=12})
   shell.addView(ScrollView(this).apply{isFillViewport=true;addView(root)},LinearLayout.LayoutParams(-1,0,1f))
-  val nav=LinearLayout(this).apply{orientation=0;gravity=android.view.Gravity.CENTER;setPadding(8,7,8,7);setBackgroundColor(forest)}
+  val nav=LinearLayout(this).apply{orientation=0;gravity=android.view.Gravity.CENTER;setPadding(8,7,8,7);setBackgroundColor(forest);visibility=if(token.isNullOrBlank()) android.view.View.GONE else android.view.View.VISIBLE}
   fun navItem(t:String,fn:()->Unit)=TextView(this).apply{text=t;gravity=android.view.Gravity.CENTER;textSize=14f;setTextColor(Color.WHITE);setTypeface(null,Typeface.BOLD);setPadding(8,13,8,13);setOnClickListener{fn()}}
   nav.addView(navItem("⌂  Home"){home()},LinearLayout.LayoutParams(0,-2,1f))
   nav.addView(navItem("▤  Orders"){orderFilter="active";orders()},LinearLayout.LayoutParams(0,-2,1f))
@@ -143,6 +144,7 @@ class MainActivity : Activity() {
   pollHandler.removeCallbacks(pollTask)
  }
  private fun home() {
+  currentScreen="home"
   setup("My Deliveries")
   val card=LinearLayout(this).apply{orientation=1;setPadding(16,16,16,16);background=rounded(Color.WHITE,20f);elevation=3f}
   card.addView(label(if(online)"You are online" else "You are offline",19f))
@@ -154,6 +156,7 @@ class MainActivity : Activity() {
   root.addView(button("Refresh orders"){orderFilter="active";orders()})
  }
  private fun orders() {
+  currentScreen="orders"
   startPolling();setup("Orders")
   root.addView(button(if(online)"Go Offline" else "Go Online"){availability(!online)},LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=10})
   listOf("Available" to "available","Pending" to "pending","Active" to "active","History" to "history","All" to "all").forEach{(t,f)->root.addView(button((if(orderFilter==f)"✓  " else "")+t){orderFilter=f;orders()},LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=6})}
@@ -184,6 +187,7 @@ class MainActivity : Activity() {
   }catch(ex:Exception){runOnUiThread{status.text=message(ex)}}}
  }
  private fun profile() {
+  currentScreen="profile"
   setup("My Profile");status.text="Loading your rider profile…"
   worker.execute{try{
    val self=request(base+"/functions/v1/restaurant-api?view=rider_self","GET",null,token);online=self.optBoolean("is_online",false)
@@ -316,7 +320,7 @@ class MainActivity : Activity() {
  }
  private fun availability(value:Boolean){
   status.text="Updating availability…"
-  worker.execute{try{request(base+"/functions/v1/restaurant-api","POST",JSONObject().put("action","set_rider_availability").put("is_online",value).toString(),token);online=value;runOnUiThread{orders()}}
+  worker.execute{try{request(base+"/functions/v1/restaurant-api","POST",JSONObject().put("action","set_rider_availability").put("is_online",value).toString(),token);online=value;runOnUiThread{when(currentScreen){"home"->home();"profile"->profile();else->orders()}}}
    catch(ex:Exception){runOnUiThread{status.text=message(ex)}}}
  }
  private fun verifyDelivery(id:String,code:String){
