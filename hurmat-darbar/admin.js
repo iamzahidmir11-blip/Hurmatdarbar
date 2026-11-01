@@ -8,7 +8,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
 const root = document.getElementById("app");
 const navRoot = document.getElementById("nav");
 const money = n => "₹" + Number(n || 0).toLocaleString("en-IN");
-const isIndianFoodCategory = name => { const key=String(name||"").trim().toLowerCase(); return key.startsWith("indian") || ["wazwan","tandoori","naan and roti","rice"].includes(key); };
+const isIndianVegCategory = name => String(name||"").trim().toLowerCase() === "indian veg";
 const esc = v => String(v == null ? "" : v).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const statusNames = {
   pending_confirmation:"Pending confirmation", confirmed:"Confirmed", preparing:"Preparing",
@@ -156,7 +156,7 @@ function menuView(){
     const variants=(i.menu_variants||[]).map(v=>'<div class="store-variant"><span>'+esc(v.label)+' <b>'+money(v.price)+'</b> '+(v.active?'':'<small>Hidden</small>')+'</span><div class="actions"><button class="btn ghost sm" data-price="'+esc(v.id)+'" data-current="'+esc(v.price)+'">Edit price</button><button class="btn ghost sm" data-variant-toggle="'+esc(v.id)+'" data-active="'+String(v.active)+'">'+(v.active?'Disable':'Enable')+'</button></div></div>').join("");
     const stock=Number(i.stock_qty||0);
     const stockBlock=i.track_stock?'<div class="inventory-panel"><div><small>AVAILABLE STOCK</small><b class="inventory-number">'+stock+'</b></div><div class="inventory-stepper"><button class="qty-step" data-stock-minus="'+esc(i.id)+'" '+(stock<=0?'disabled':'')+'>−</button><button class="qty-step" data-stock-plus="'+esc(i.id)+'">+</button><button class="btn ghost sm" data-stock-set="'+esc(i.id)+'">Set</button></div><span class="stock-state '+(stock===0?'out':stock<=5?'low':'in')+'">'+(stock===0?'Out':stock<=5?'Low stock':'In stock')+'</span></div>':'<div class="inventory-panel inventory-off"><span>Stock tracking is off</span><button class="btn ghost sm" data-stock-enable="'+esc(i.id)+'">Set opening stock</button></div>';
-    const foodType=isIndianFoodCategory(i.menu_categories?.name)?'<span class="store-photo-type">'+(i.is_veg===true?'VEG':i.is_veg===false?'NON-VEG':'NOT SET')+'</span>':"";
+    const foodType=isIndianVegCategory(i.menu_categories?.name)?'<span class="store-photo-type">'+('VEG')+'</span>':"";
     return '<article class="store-product" data-product-card data-name="'+esc((i.name+" "+(i.description||"")+" "+(i.menu_categories?.name||"")).toLowerCase())+'" data-published="'+String(i.active)+'" data-tracked="'+String(i.track_stock)+'" data-stock-value="'+stock+'"><div class="store-product-photo">'+photo+foodType+'<span class="store-publish-tag '+(i.active?'published':'hidden')+'">'+(i.active?'PUBLISHED':'HIDDEN')+'</span></div><div class="store-product-info"><div class="store-product-heading"><div><small>'+esc(i.menu_categories?.name||"Uncategorised")+'</small><h3>'+esc(i.name)+'</h3></div><b class="store-product-price">'+money(Math.min(...(i.menu_variants||[]).filter(v=>v.active&&v.price!==null).map(v=>Number(v.price)).concat([0]).filter(n=>n>0))||0)+'</b></div><p>'+esc(i.description||"No product description added.")+'</p>'+stockBlock+'<div class="store-variants"><div class="store-section-label">PORTIONS & PRICING</div>'+(variants||'<small>No variants configured.</small>')+'</div><div class="store-product-actions"><button class="btn ghost sm" data-upload-image="'+esc(i.id)+'">Photo</button><button class="btn ghost sm" data-edit-item="'+esc(i.id)+'">Edit</button><button class="btn ghost sm" data-add-variant="'+esc(i.id)+'">+ Variant</button><button class="btn ghost sm" data-toggle="'+esc(i.id)+'" data-available="'+String(i.available)+'">'+(i.available?'Pause item':'Enable item')+'</button><button class="btn sm" data-publish="'+esc(i.id)+'" data-active="'+String(i.active)+'">'+(i.active?'Hide':'Publish')+'</button></div></div></article>';
   }).join("");
   const catCards=menuCategories.map(c=>'<span class="store-category-chip">'+esc(c.name)+'</span>').join("");
@@ -485,7 +485,7 @@ function bindActions(){
     const description=prompt("Product description:",item.description||"");if(description===null)return;
     const imageUrl=prompt("Food photo URL (https://) — leave blank for no photo:",item.image_url||"");if(imageUrl===null)return;
     if(imageUrl.trim()&&!imageUrl.trim().startsWith("https://")){toast("Photo URL must start with https://",true);return;}
-    const indianFood=isIndianFoodCategory(item.menu_categories?.name);
+    const indianFood=isIndianVegCategory(item.menu_categories?.name);
     let vegValue=null;
     if(indianFood){const veg=prompt("Indian food type: enter VEG or NON-VEG",item.is_veg===true?"VEG":item.is_veg===false?"NON-VEG":"");if(veg===null)return;if(!["veg","non-veg"].includes(veg.trim().toLowerCase())){toast("Enter VEG or NON-VEG for Indian food.",true);return;}vegValue=veg.trim().toLowerCase()==="veg";}
     if(!name.trim()||name.trim().length<2||name.length>120||description.length>500){toast("Check product name and description.",true);return;}
@@ -608,7 +608,7 @@ function bindActions(){
     const description=prompt("Short product description:","Freshly prepared at Hurmat Darbar");if(description===null)return;
     const imageUrl=prompt("Food photo URL (https://), optional:","");if(imageUrl===null)return;
     if(imageUrl.trim()&&!imageUrl.trim().startsWith("https://")){toast("Photo URL must start with https://",true);return;}
-    const indianFood=isIndianFoodCategory(match.name);
+    const indianFood=isIndianVegCategory(match.name);
     let vegValue=null;
     if(indianFood){const veg=prompt("Indian food type: VEG or NON-VEG","");if(!["veg","non-veg"].includes(String(veg||"").trim().toLowerCase())){toast("Enter VEG or NON-VEG for Indian food.",true);return;}vegValue=String(veg).trim().toLowerCase()==="veg";}
     const price=Number(prompt("Regular price in rupees:","100"));if(!Number.isInteger(price)||price<1){toast("Enter a valid price.",true);return;}
