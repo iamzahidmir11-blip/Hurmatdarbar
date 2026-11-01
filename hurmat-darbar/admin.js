@@ -18,7 +18,7 @@ const statusNames = {
 const tabs = [["home","⌂","Overview"],["orders","▤","Orders"],["menu","▦","Menu"],["inventory","▣","Inventory"],["availability","✓","Delivery checks"],["payments","₹","Payments"],["refunds","↩","Refunds"],["reservations","◷","Bookings"],["riders","♧","Riders"],["reports","▥","Reports"],["settings","⚙","Store setup"],["alerts","♢","Alerts"]];
 // Temporary development-only UI preview. Live data and all write operations remain protected.
 const DEVELOPMENT_PREVIEW = false;
-let user=null, role=null, page="home", orders=[], menuItems=[], menuCategories=[], reservations=[], riders=[], notifications=[], availabilityRequests=[], availabilityLoadError="", payments=[], refunds=[], settings=null, channel=null, busy=false, availabilityRefreshTimer=null;
+let user=null, role=null, page="home", orders=[], menuItems=[], menuCategories=[], reservations=[], riders=[], notifications=[], availabilityRequests=[], cashCollections=[], availabilityLoadError="", payments=[], refunds=[], settings=null, channel=null, busy=false, availabilityRefreshTimer=null;
 
 function toast(message, bad=false){
   let el=document.getElementById("admin-toast");
@@ -174,7 +174,8 @@ function reservationsView(){
 function ridersView(){
   const list=riders.map(r=>'<div class="item-row"><div class="item-meta"><b>'+esc(r.name||"Rider")+'</b><span class="mute">'+esc(r.phone||"No phone on file")+'</span></div><span class="tag '+(r.is_online?"s-ready":"s-served")+'">'+(r.is_online?"Online":"Offline")+'</span></div>').join("")||empty("No rider accounts are linked yet.");
   const create=role==="owner"?'<section class="partner-panel" style="margin:12px 0"><div class="panel-heading"><div><h2>Create rider account</h2><p>Creates the secure sign-in, rider role and delivery profile together.</p></div></div><form id="rider-create-form" class="card"><label>Rider full name</label><input id="rider-name" required minlength="2" maxlength="80" placeholder="Full name"><label>Rider phone</label><input id="rider-phone" required type="tel" minlength="7" maxlength="20" placeholder="Phone number"><label>Rider email</label><input id="rider-email" required type="email" autocomplete="off" placeholder="rider@example.com"><label>Temporary password (10+ chars, uppercase, lowercase, number and symbol)</label><input id="rider-password" required type="password" minlength="10" autocomplete="new-password" placeholder="Create a temporary password"><button class="btn wide" id="rider-create-submit" type="submit">Create rider account</button><p class="mute" style="font-size:11px;line-height:1.6;margin-top:10px">Share the temporary password privately. The rider can sign in to the separate Hurmat Darbar Delivery app.</p></form></section>':"";
-  return create+'<section class="partner-panel"><div class="panel-heading"><div><h2>Registered riders</h2><p>Online availability updates from the delivery app.</p></div></div>'+list+'</section>';
+  const cashRows=cashCollections.map(c=>'<article class="card" style="margin:10px 0"><div class="row"><b>Order #'+esc(c.orders?.order_no||"—")+'</b><span class="tag '+(c.handed_over?"s-served":"s-new")+'">'+(c.handed_over?"Handed over":"Cash with rider")+'</span></div><p class="mute">'+esc(c.rider_name||"Rider")+' · '+money(c.amount)+' · '+new Date(c.collected_at).toLocaleString()+'</p>'+(c.handed_over?'<p class="mute">Received '+(c.handed_over_at?new Date(c.handed_over_at).toLocaleString():"")+'</p>':'<button class="btn sm" data-cash-handover="'+esc(c.order_id)+'">Confirm cash received</button>')+'</article>').join("")||empty("No COD cash collections recorded yet.");
+  return create+'<section class="partner-panel"><div class="panel-heading"><div><h2>Registered riders</h2><p>Online availability updates from the delivery app.</p></div></div>'+list+'</section><section class="partner-panel" style="margin-top:14px"><div class="panel-heading"><div><h2>COD cash reconciliation</h2><p>Cash recorded by riders after customer delivery.</p></div><span class="pill">'+cashCollections.filter(c=>!c.handed_over).length+' pending</span></div>'+cashRows+'</section>';
 }
 function reportsView(){
   const now=new Date(),days=[];
@@ -305,6 +306,7 @@ async function refresh(){
     supabase.from("notifications").select("id,title,body,order_id,is_read,created_at").order("created_at",{ascending:false}).limit(60),
     supabase.from("restaurant_settings").select("*").eq("id",1).single(),
     role==="owner"?api("availability"):Promise.resolve({requests:[]}),
+    ["owner","manager","delivery_manager"].includes(role)?api("cash_collections"):Promise.resolve({cash_collections:[]}),
     (role==="owner"||role==="manager")?api("payments"):Promise.resolve({payments:[]}),(role==="owner"||role==="manager")?api("refunds"):Promise.resolve({refunds:[]})]);
   if(results[0].status==="fulfilled")orders=results[0].value.orders||[];
   if(results[1].status==="fulfilled")menuItems=results[1].value.items||[];
@@ -313,9 +315,10 @@ async function refresh(){
   if(results[4].status==="fulfilled"&&!results[4].value.error)notifications=results[4].value.data||[];
   if(results[5].status==="fulfilled"&&!results[5].value.error)settings=results[5].value.data;
   if(results[6].status==="fulfilled"){availabilityRequests=results[6].value.requests||[];availabilityLoadError="";}
+  if(results[7].status==="fulfilled")cashCollections=results[7].value.cash_collections||[];
   else{availabilityLoadError=results[6].reason?.message||"Owner availability API is unavailable.";}
-  if(results[7].status==="fulfilled")payments=results[7].value.payments||[];
-  if(results[8].status==="fulfilled")refunds=results[8].value.refunds||[];
+  if(results[8].status==="fulfilled")payments=results[8].value.payments||[];
+  if(results[9].status==="fulfilled")refunds=results[9].value.refunds||[];
   const categoryResult=await supabase.from("menu_categories").select("id,name,active,sort_order").order("sort_order");if(!categoryResult.error)menuCategories=categoryResult.data||[];
   render();
 }
@@ -399,6 +402,12 @@ function bindActions(){
   document.querySelectorAll("[data-cancel]").forEach(b=>b.onclick=async()=>{
     const reason=prompt("Enter a reason for cancelling or rejecting this order:");if(!reason||!reason.trim())return;
     try{await api("",{action:"update_order_status",order_id:b.dataset.cancel,status:"cancelled",reason:reason.trim()});await refresh();toast("Order cancelled.");}catch(e){toast(e.message,true);}
+  });
+  document.querySelectorAll("[data-cash-handover]").forEach(b=>b.onclick=async()=>{
+    if(!confirm("Confirm that cash for this order has been received from the rider?"))return;
+    b.disabled=true;
+    try{await api("",{action:"mark_cash_handed_over",order_id:b.dataset.cashHandover});await refresh();toast("Cash handover recorded.");}
+    catch(e){toast(e.message||"Cash handover failed.",true);b.disabled=false;}
   });
   document.querySelectorAll("[data-assign]").forEach(b=>b.onclick=async()=>{
     const rider=document.getElementById("rider-"+b.dataset.assign).value;if(!rider){toast("Choose a rider first.",true);return;}
