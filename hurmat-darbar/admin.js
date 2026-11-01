@@ -490,7 +490,10 @@ function bindActions(){
   document.querySelectorAll("[data-reservation]").forEach(b=>b.onclick=async()=>{
     try{await api("",{action:"update_reservation_status",reservation_id:b.dataset.reservation,status:b.dataset.resStatus});await refresh();toast("Reservation updated.");}catch(e){toast(e.message,true);}
   });
-  const ownerPushEnable=document.getElementById("owner-push-enable");if(ownerPushEnable)ownerPushEnable.onclick=enableOwnerPush;\n  const ownerPushDisable=document.getElementById("owner-push-disable");if(ownerPushDisable)ownerPushDisable.onclick=disableOwnerPush;\n  ownerPushState();\n  document.querySelectorAll("[data-read]").forEach(b=>b.onclick=async()=>{
+  const ownerPushEnable=document.getElementById("owner-push-enable");if(ownerPushEnable)ownerPushEnable.onclick=enableOwnerPush;
+  const ownerPushDisable=document.getElementById("owner-push-disable");if(ownerPushDisable)ownerPushDisable.onclick=disableOwnerPush;
+  ownerPushState();
+  document.querySelectorAll("[data-read]").forEach(b=>b.onclick=async()=>{
     const {error}=await supabase.from("notifications").update({is_read:true}).eq("id",b.dataset.read);if(error){toast(error.message,true);return;}await refresh();
   });
   const ownerInviteForm=document.getElementById("owner-invite-form");
