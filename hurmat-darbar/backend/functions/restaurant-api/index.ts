@@ -278,6 +278,13 @@ Deno.serve(async (req: Request) => {
         return reply({ availability: data });
       }
 
+      case "record_cod_cash": {
+        if (!roles.has("rider") || !isUuid(body.order_id)) return reply({ error: "forbidden_or_invalid_order" }, 403);
+        const { error } = await supabase.rpc("rider_record_cash", { p_order: body.order_id });
+        if (error) return reply({ error: error.message || "cod_collection_failed" }, 400);
+        return reply({ ok: true, payment_status: "cod_collected" });
+      }
+
       case "set_rider_availability": {
         if (!roles.has("rider") || typeof body.is_online !== "boolean") return reply({ error: "forbidden_or_invalid_availability" }, 403);
         const { error } = await supabase.from("riders").update({ is_online: body.is_online, last_seen: new Date().toISOString() }).eq("user_id", user.id);
