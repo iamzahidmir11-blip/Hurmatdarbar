@@ -539,7 +539,7 @@ function bindActions(){
       await api("",{action:"create_rider_account",name,phone,email,password});
       riderForm.reset();await refresh();toast("Rider account and delivery profile created.");
     }catch(err){
-      const messages={rider_accounts_not_configured:"Secure rider account creation is not configured on the server.",rider_email_already_registered:"This email already has a Supabase account.",invalid_rider_email:"Enter a valid rider email.",weak_rider_password:"Use 10+ characters with uppercase, lowercase, a number and a symbol.",invalid_rider_profile:"Enter a valid rider name and phone number."};
+      const messages={rider_accounts_not_configured:"Secure rider account creation is not configured on the server.",rider_email_already_registered:"This email already has a Supabase account. Use a new rider email, or ask the owner to activate the existing account.",rider_account_creation_failed:"Supabase could not create this rider login. Check the email and try again.",rider_role_activation_failed:"The login was created but rider access could not be activated. Contact support before trying again.",rider_profile_creation_failed:"Rider login/profile setup failed. Contact support before retrying.",invalid_rider_email:"Enter a valid rider email address.",weak_rider_password:"Use 10+ characters with uppercase, lowercase, a number and a symbol.",invalid_rider_profile:"Enter a valid rider name and phone number."};
       toast(messages[err.message]||err.message||"Rider account could not be created.",true);
     }finally{button.disabled=false;button.textContent="Create rider account";}
   };
