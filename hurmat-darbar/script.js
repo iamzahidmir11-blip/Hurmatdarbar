@@ -121,13 +121,13 @@ function clearAvailability(message){
   if(orderHelp&&availabilityMessage)orderHelp.textContent=availabilityMessage;
   checkoutState();
 }
-function ensureGuestSession(){
-  return db.auth.getSession().then(async ({data:{session}})=>{
-    if(session)return session;
-    const anon=await db.auth.signInAnonymously();
-    if(anon.error)throw new Error("Secure guest checkout is not enabled on the restaurant account yet. Please contact the restaurant.");
-    return anon.data.session;
-  });
+async function ensureGuestSession(){
+  const {data:{session},error}=await db.auth.getSession();
+  if(error)throw new Error("Could not verify your customer session. Please log in again.");
+  if(!session||!session.user||session.user.is_anonymous){
+    throw new Error("Please create a customer account or log in before continuing.");
+  }
+  return session;
 }
 async function callRestaurantApi(method,query,body){
   const session=await ensureGuestSession();
