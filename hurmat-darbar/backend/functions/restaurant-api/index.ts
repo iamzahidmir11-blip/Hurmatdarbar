@@ -151,6 +151,21 @@ Deno.serve(async (req: Request) => {
         if (error) return reply({ error: "reservations_unavailable" }, 500);
         return reply({ reservations: data ?? [] });
       }
+      if (view === "cash_collections") {
+        if (![...roles].some((r) => ["owner", "manager", "delivery_manager"].includes(r))) return reply({ error: "forbidden" }, 403);
+        const { data, error } = await supabase.from("cash_collections")
+          .select("id,order_id,rider_id,amount,collected_at,handed_over,handed_over_at,orders(order_no)")
+          .order("collected_at", { ascending: false }).limit(100);
+        if (error) return reply({ error: "cash_collections_unavailable" }, 500);
+        const riderIds = [...new Set((data ?? []).map((x: { rider_id: string }) => x.rider_id))];
+        const { data: riderRows } = riderIds.length
+          ? await supabase.from("riders").select("user_id,name").in("user_id", riderIds)
+          : { data: [] };
+        const names = new Map((riderRows ?? []).map((x: { user_id: string; name: string }) => [x.user_id, x.name]));
+        return reply({ cash_collections: (data ?? []).map((x: Record<string, any>) => ({
+          ...x, rider_name: names.get(x.rider_id) ?? "Rider",
+        })) });
+      }
       if (view === "riders") {
         if (![...roles].some((r) => ["owner", "manager", "delivery_manager"].includes(r))) return reply({ error: "forbidden" }, 403);
         const { data, error } = await supabase.from("riders").select("user_id, name, phone, is_online, last_seen").order("name");
@@ -408,6 +423,14 @@ Deno.serve(async (req: Request) => {
           p_reason: reason,
         });
         if (error) return reply({ error: "status_update_failed", code: error.message }, 400);
+        return reply({ ok: true });
+      }
+
+      case "mark_cash_handed_over": {
+        if (![...roles].some((r) => ["owner", "manager", "delivery_manager"].includes(r))) return reply({ error: "forbidden" }, 403);
+        if (!isUuid(body.order_id)) return reply({ error: "invalid_order_id" }, 400);
+        const { error } = await supabase.rpc("mark_cash_handed_over", { p_order: body.order_id });
+        if (error) return reply({ error: error.message || "cash_handover_failed" }, 400);
         return reply({ ok: true });
       }
 
