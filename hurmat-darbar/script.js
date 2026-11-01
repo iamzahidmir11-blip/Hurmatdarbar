@@ -418,7 +418,7 @@ function setCustomerAuthMode(mode){
   document.getElementById("customer-auth-switch").textContent=signup?"Already have an account? Log in":"New here? Create an account";
 }
 if(customerAuthForm){
-  setCustomerAuthMode("signup");
+  setCustomerAuthMode("login");
   document.getElementById("customer-auth-switch").onclick=()=>setCustomerAuthMode(customerAuthMode==="signup"?"login":"signup");
   document.getElementById("customer-auth-logout").onclick=async()=>{
     const {error}=await db.auth.signOut();if(error){customerAuthMessage(error.message,true);return;}
@@ -437,15 +437,23 @@ if(customerAuthForm){
     button.disabled=true;button.textContent=customerAuthMode==="signup"?"Creating account…":"Logging in…";
     try{
       if(customerAuthMode==="signup"){
-        await ensureGuestSession();
-        const {data:{user:current}}=await db.auth.getUser();
-        if(current&&!current.is_anonymous)throw new Error("You are already logged in. Log out first before creating another account.");
-        const result=await db.auth.updateUser({email,password,data:{full_name:name,phone}});
-        if(result.error)throw result.error;
-        if(!result.data.session){customerAuthMessage("Account created. Check your email for the verification link, then return here and log in.",false);return;}
-        customerAuthMessage("Account created successfully. Your previous guest orders on this device are linked to this account.");
+        const {data,error}=await db.auth.signUp({
+          email,
+          password,
+          options:{data:{full_name:name,phone}}
+        });
+        if(error)throw error;
+        if(!data.user)throw new Error("Supabase did not return a new customer account.");
+        if(!data.session){
+          customerAuthMessage("Account created. Please verify your email, then return and log in.",false);
+          setCustomerAuthMode("login");
+          return;
+        }
+        customerAuthMessage("Account created successfully. Your customer account is now active.");
       }else{
-        const {error}=await db.auth.signInWithPassword({email,password});if(error)throw error;
+        const {data,error}=await db.auth.signInWithPassword({email,password});
+        if(error)throw error;
+        if(!data.user||data.user.is_anonymous)throw new Error("A registered customer account is required.");
         customerAuthMessage("You are logged in.");
       }
       await applyCustomerGate();await loadCustomerProfile();await loadMyOrders();showCustomerTab("profile");
