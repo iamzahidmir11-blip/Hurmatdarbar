@@ -334,7 +334,7 @@ async function load(){
   status.textContent="Loading live menu and restaurant settings…";
   const [a,b,c]=await Promise.all([
     db.from("menu_categories").select("id,name,sort_order").eq("active",true).order("sort_order"),
-    db.from("menu_items").select("id,category_id,name,description,image_url,is_veg,available,track_stock,stock_qty,sort_order,menu_categories(name),menu_variants(id,label,price,sort_order,active)").eq("active",true).order("sort_order"),
+    db.from("menu_items").select("id,category_id,name,description,image_url,is_veg,available,needs_verification,track_stock,stock_qty,sort_order,menu_categories(name),menu_variants(id,label,price,sort_order,active)").eq("active",true).order("sort_order"),
     db.from("restaurant_settings").select("name,is_open,location_verified,lat,lng,delivery_fee,min_order,cod_enabled,upi_enabled,upi_id").eq("id",1).single()
   ]);
   if(a.error||b.error){status.textContent="Menu unavailable. Please call +91 97971 51590.";return;}
@@ -342,7 +342,7 @@ async function load(){
   restaurantSettings=c.data;
   const openBadge=document.getElementById("restaurant-open-state");
   if(openBadge){openBadge.textContent=restaurantSettings.is_open?"● Accepting orders":"● Orders paused";openBadge.classList.toggle("closed",!restaurantSettings.is_open);}
-  items=(b.data||[]).map(x=>({...x,category_name:x.menu_categories?.name||"",menu_variants:(x.menu_variants||[]).filter(v=>v.active!==false&&v.price!==null).sort((p,q)=>p.sort_order-q.sort_order)})).filter(x=>x.menu_variants.length);
+  items=(b.data||[]).filter(x=>!x.needs_verification).map(x=>({...x,category_name:x.menu_categories?.name||"",menu_variants:(x.menu_variants||[]).filter(v=>v.active!==false&&v.price!==null).sort((p,q)=>p.sort_order-q.sort_order)})).filter(x=>x.menu_variants.length);
   cart=cart.flatMap(line=>{const item=items.find(x=>x.id===line.item_id&&x.available!==false),variant=item?.menu_variants.find(v=>v.id===line.variant_id);return item&&variant?[{...line,key:cartKey(item.id,variant.id),name:item.name,label:variant.label,price:Number(variant.price),qty:Math.max(1,Math.min(50,Number(line.qty)||1))}]:[]});
   localStorage.setItem("hd-cart",JSON.stringify(cart));cart.forEach(line=>{selectedVariants[line.item_id]=line.variant_id});
   renderCats(a.data||[]);
