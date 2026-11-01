@@ -4,14 +4,12 @@ import android.app.Activity
 import android.os.Bundle
 import android.graphics.Color
 import android.webkit.CookieManager
-import android.net.http.SslErrorHandler
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.net.Uri
 import android.content.Intent
-import android.webkit.SslError
 
 class MainActivity : Activity() {
     private lateinit var web: WebView
@@ -48,9 +46,6 @@ class MainActivity : Activity() {
                     return true
                 }
 
-                override fun onReceivedSslError(view: WebView, handler: SslErrorHandler, error: SslError) {
-                    handler.cancel()
-                }
             }
         }
         setContentView(web)
