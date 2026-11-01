@@ -557,7 +557,7 @@ function renderMyOrders(data,payments,refunds=[]){
         if(card.querySelector(".refund-bank-form"))return;
         const form=el("form","my-order-proof-form refund-bank-form");
         const fields=[];
-        if(o.payment_status==="paid"){
+        if(["paid","cod_collected"].includes(o.payment_status)){
           const holder=el("input",""),bank=el("input",""),account=el("input",""),ifsc=el("input","");
           holder.placeholder="Account holder name";holder.autocomplete="name";holder.required=true;holder.maxLength=80;
           bank.placeholder="Bank name";bank.required=true;bank.maxLength=100;
