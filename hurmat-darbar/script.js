@@ -513,7 +513,7 @@ db.auth.onAuthStateChange((event,session)=>{
   }
 });
 // Keep the page locked until Supabase confirms a registered customer session.
-applyCustomerGate();
+applyCustomerGate().then(signedIn=>{if(signedIn&&new URLSearchParams(location.search).get("tab")==="notifications")showCustomerTab("notifications");});
 async function requestCustomerPasswordReset(){
   const email=document.getElementById("account-email").value.trim().toLowerCase();
   if(!email||!document.getElementById("account-email").checkValidity()){customerAuthMessage("Enter your registered email first, then tap Forgot password.",true);return;}
