@@ -75,10 +75,16 @@ Deno.serve(async (req: Request) => {
       if (view === "refunds") {
         if (![...roles].some((r) => ["owner", "manager"].includes(r))) return reply({ error: "forbidden" }, 403);
         const { data, error } = await supabase.from("refund_requests")
-          .select("id,order_id,customer_id,amount,reason,status,refund_method,refund_reference,owner_note,requested_at,processed_at,orders(order_no,customer_name,customer_phone,total,payment_method,payment_status,status)")
+          .select("id,order_id,customer_id,amount,cancellation_fee,reason,status,refund_method,refund_reference,owner_note,requested_at,processed_at,orders(order_no,customer_name,customer_phone,total,payment_method,payment_status,status)")
           .order("requested_at", { ascending: false }).limit(100);
         if (error) return reply({ error: "refunds_unavailable" }, 500);
-        return reply({ refunds: data ?? [] });
+        const refunds = await Promise.all((data ?? []).map(async (item: Record<string, any>) => {
+          const { data: bankRows, error: bankError } = await supabase.rpc("get_refund_bank_details", {
+            p_refund_id: item.id,
+          });
+          return { ...item, bank_details: bankError ? null : (bankRows?.[0] ?? null) };
+        }));
+        return reply({ refunds });
       }
       if (view === "payments") {
         if (![...roles].some((r) => ["owner", "manager"].includes(r))) return reply({ error: "forbidden" }, 403);
