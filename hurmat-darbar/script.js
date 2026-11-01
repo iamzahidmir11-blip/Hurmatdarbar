@@ -357,16 +357,42 @@ if(reservationForm)reservationForm.addEventListener("submit",async e=>{
 });
 
 const myOrdersRoot=document.getElementById("my-orders-list");
+function updateCustomerDashboard(signedIn){
+  const nav=document.getElementById("customer-bottom-nav");
+  if(nav)nav.hidden=!signedIn;
+  if(signedIn)showCustomerTab("profile");
+}
+function showCustomerTab(tab){
+  const menu=document.getElementById("menu"), services=document.getElementById("services"), account=document.getElementById("my-account"), orders=document.getElementById("my-orders"), visit=document.getElementById("visit");
+  const auth=document.getElementById("customer-auth-form"), profile=document.getElementById("customer-profile-card");
+  if(auth)auth.hidden=document.body.classList.contains("customer-authenticated");
+  if(profile)profile.hidden=tab!=="profile";
+  if(menu)menu.hidden=tab!=="menu";
+  if(services)services.hidden=tab!=="menu";
+  if(account)account.hidden=tab!=="profile";
+  if(orders)orders.hidden=tab!=="orders";
+  if(visit)visit.hidden=tab!=="menu";
+  document.querySelectorAll("[data-customer-tab]").forEach(b=>b.classList.toggle("active",b.dataset.customerTab===tab));
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+const customerNav=document.getElementById("customer-bottom-nav");
+if(customerNav)customerNav.addEventListener("click",e=>{const b=e.target.closest("[data-customer-tab]");if(b)showCustomerTab(b.dataset.customerTab);});
 const customerAuthForm=document.getElementById("customer-auth-form");
 let customerAuthMode="signup";
 function applyCustomerGate(){
   return db.auth.getUser().then(({data:{user}})=>{
-    document.body.classList.toggle("customer-locked",!user||user.is_anonymous);
-    return !!user&&!user.is_anonymous;
+    const signedIn=!!user&&!user.is_anonymous;
+    document.body.classList.toggle("customer-locked",!signedIn);
+    document.body.classList.toggle("customer-authenticated",signedIn);
+    updateCustomerDashboard(signedIn);
+    return signedIn;
   }).catch(()=>{document.body.classList.add("customer-locked");return false;});
 }
 db.auth.onAuthStateChange((event,session)=>{
-  document.body.classList.toggle("customer-locked",!session?.user||session.user.is_anonymous);
+  const signedIn=!!session?.user&&!session.user.is_anonymous;
+  document.body.classList.toggle("customer-locked",!signedIn);
+  document.body.classList.toggle("customer-authenticated",signedIn);
+  updateCustomerDashboard(signedIn);
 });
 // Keep the page locked until Supabase confirms a registered customer session.
 applyCustomerGate();
@@ -391,7 +417,7 @@ if(customerAuthForm){
   document.getElementById("customer-auth-switch").onclick=()=>setCustomerAuthMode(customerAuthMode==="signup"?"login":"signup");
   document.getElementById("customer-auth-logout").onclick=async()=>{
     const {error}=await db.auth.signOut();if(error){customerAuthMessage(error.message,true);return;}
-    customerAuthMessage("You have logged out.");document.body.classList.add("customer-locked");await loadCustomerProfile();await loadMyOrders();
+    customerAuthMessage("You have logged out.");document.body.classList.add("customer-locked");document.body.classList.remove("customer-authenticated");updateCustomerDashboard(false);await loadCustomerProfile();await loadMyOrders();
   };
   customerAuthForm.addEventListener("submit",async e=>{
     e.preventDefault();
@@ -411,13 +437,13 @@ if(customerAuthForm){
         if(current&&!current.is_anonymous)throw new Error("You are already logged in. Log out first before creating another account.");
         const result=await db.auth.updateUser({email,password,data:{full_name:name,phone}});
         if(result.error)throw result.error;
-        if(!result.data.session)throw new Error("Email confirmation is enabled in Supabase. Turn OFF Confirm email to allow password signup without OTP.");
+        if(!result.data.session){customerAuthMessage("Account created. Check your email for the verification link, then return here and log in.",false);return;}
         customerAuthMessage("Account created successfully. Your previous guest orders on this device are linked to this account.");
       }else{
         const {error}=await db.auth.signInWithPassword({email,password});if(error)throw error;
         customerAuthMessage("You are logged in.");
       }
-      await applyCustomerGate();await loadCustomerProfile();await loadMyOrders();
+      await applyCustomerGate();await loadCustomerProfile();await loadMyOrders();showCustomerTab("profile");
     }catch(error){customerAuthMessage(error.message||"Account action failed.",true);}
     finally{button.disabled=false;button.textContent=customerAuthMode==="signup"?"Create account":"Log in";}
   });
@@ -450,7 +476,8 @@ if(profileSave)profileSave.onclick=async()=>{
   const {error}=await db.from("customer_profiles").upsert({user_id:user.id,full_name,phone,email:user.email,updated_at:new Date().toISOString()});
   profileSave.disabled=false;
   if(error){customerAuthMessage(error.message,true);return;}
-  await db.auth.updateUser({data:{full_name,phone}});
+  const {error:metadataError}=await db.auth.updateUser({data:{full_name,phone}});
+  if(metadataError){customerAuthMessage("Profile saved to your customer record, but account metadata did not update: "+metadataError.message,true);return;}
   document.getElementById("customer-profile-summary").textContent=user.email+" · Profile saved.";
   const n=document.getElementById("customer-name"),p=document.getElementById("customer-phone");if(n)n.value=full_name;if(p)p.value=phone;
 };
