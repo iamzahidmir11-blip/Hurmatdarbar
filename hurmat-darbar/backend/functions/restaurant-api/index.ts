@@ -77,6 +77,26 @@ Deno.serve(async (req: Request) => {
     if (req.method === "GET") {
       const view = new URL(req.url).searchParams.get("view") ?? "orders";
       const requestId = new URL(req.url).searchParams.get("request_id");
+      if (view === "rider_self") {
+        if (!roles.has("rider")) return reply({ error: "forbidden" }, 403);
+        const { data, error } = await supabase.from("riders")
+          .select("user_id,name,phone,is_online,last_seen").eq("user_id", user.id).maybeSingle();
+        if (error || !data) return reply({ error: "rider_profile_unavailable" }, 404);
+        return reply({ ...data });
+      }
+      if (view === "available_orders") {
+        if (!roles.has("rider")) return reply({ error: "forbidden" }, 403);
+        const { data: rider, error: riderError } = await supabase.from("riders")
+          .select("is_online").eq("user_id", user.id).maybeSingle();
+        if (riderError || !rider) return reply({ error: "rider_profile_unavailable" }, 404);
+        if (!rider.is_online) return reply({ orders: [], rider_offline: true });
+        const { data, error } = await supabase.from("orders")
+          .select("id,order_no,customer_name,address_text,lat,lng,payment_method,payment_status,status,total,created_at,order_items(id,item_name,variant_label,qty)")
+          .is("rider_id", null).eq("status", "ready_for_pickup")
+          .order("created_at", { ascending: true }).limit(50);
+        if (error) return reply({ error: "available_orders_unavailable" }, 500);
+        return reply({ orders: data ?? [], rider_offline: false });
+      }
       if (view === "my_orders") {
         const { data, error } = await supabase.from("orders")
           .select("id, order_no, tracking_token, customer_name, customer_phone, address_text, payment_method, payment_status, status, subtotal, delivery_fee, total, created_at, updated_at, order_items(id,item_name,variant_label,unit_price,qty,line_total)")
@@ -462,6 +482,14 @@ Deno.serve(async (req: Request) => {
         const { data, error } = await supabase.rpc("create_order_after_availability", { p: body.order });
         if (error) return reply({ error: "order_creation_failed", code: error.message }, 400);
         return reply({ order: data }, 201);
+      }
+
+      case "claim_delivery_order": {
+        if (!roles.has("rider")) return reply({ error: "forbidden" }, 403);
+        if (!isUuid(body.order_id)) return reply({ error: "invalid_order_id" }, 400);
+        const { data, error } = await supabase.rpc("claim_delivery_order", { p_order: body.order_id });
+        if (error) return reply({ error: error.message || "order_claim_failed" }, 400);
+        return reply(data ?? { ok: true });
       }
 
       case "assign_rider": {
