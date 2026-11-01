@@ -553,15 +553,43 @@ function renderMyOrders(data,payments,refunds=[]){
     }
     if(["pending_confirmation","confirmed"].includes(o.status)){
       const cancel=el("button","btn ghost sm","Cancel order");cancel.type="button";
-      cancel.onclick=async()=>{
-        if(!confirm("Cancel order #"+o.order_no+"? This is available only before preparation starts."))return;
-        cancel.disabled=true;cancel.textContent="Cancelling…";
-        try{
-          const {error}=await db.rpc("customer_cancel_order",{p_order:o.id,p_reason:"Cancelled by customer"});
-          if(error)throw error;
-          await loadMyOrders();
-          alert("Order cancelled. If payment was collected, a refund request has been sent to the restaurant.");
-        }catch(error){alert(error.message||"Could not cancel this order.");cancel.disabled=false;cancel.textContent="Cancel order";}
+      cancel.onclick=()=>{
+        if(card.querySelector(".refund-bank-form"))return;
+        const form=el("form","my-order-proof-form refund-bank-form");
+        const fields=[];
+        if(o.payment_status==="paid"){
+          const holder=el("input",""),bank=el("input",""),account=el("input",""),ifsc=el("input","");
+          holder.placeholder="Account holder name";holder.autocomplete="name";holder.required=true;holder.maxLength=80;
+          bank.placeholder="Bank name";bank.required=true;bank.maxLength=100;
+          account.placeholder="Bank account number";account.inputMode="numeric";account.autocomplete="off";account.required=true;account.maxLength=20;
+          ifsc.placeholder="IFSC code";ifsc.autocomplete="off";ifsc.required=true;ifsc.maxLength=11;
+          fields.push(holder,bank,account,ifsc);
+          form.append(el("p","my-order-meta","Refund details (securely encrypted). A 6% cancellation charge applies to paid customer cancellations."));
+          form.append(...fields);
+        }else{
+          form.append(el("p","my-order-meta","Confirm cancellation? No paid refund is due for this order."));
+        }
+        const submit=el("button","btn primary","Confirm cancellation");submit.type="submit";
+        const close=el("button","btn ghost sm","Keep order");close.type="button";close.onclick=()=>form.remove();
+        form.append(submit,close);
+        form.onsubmit=async event=>{
+          event.preventDefault();
+          if(!confirm("Cancel order #"+o.order_no+"?"))return;
+          submit.disabled=true;submit.textContent="Submitting…";
+          try{
+            const {error}=await db.rpc("customer_cancel_order_with_refund_details",{
+              p_order:o.id,p_reason:"Cancelled by customer",
+              p_account_holder:fields[0]?.value.trim()||null,
+              p_bank_name:fields[1]?.value.trim()||null,
+              p_account_number:fields[2]?.value.trim()||null,
+              p_ifsc:fields[3]?.value.trim().toUpperCase()||null
+            });
+            if(error)throw error;
+            await loadMyOrders();
+            alert("Order cancelled. The refund request and bank details have been securely sent to the restaurant.");
+          }catch(error){alert(error.message||"Could not cancel this order.");submit.disabled=false;submit.textContent="Confirm cancellation";}
+        };
+        card.append(form);
       };
       card.append(cancel);
     }
