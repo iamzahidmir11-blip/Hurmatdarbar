@@ -315,8 +315,8 @@ async function refresh(){
   if(results[4].status==="fulfilled"&&!results[4].value.error)notifications=results[4].value.data||[];
   if(results[5].status==="fulfilled"&&!results[5].value.error)settings=results[5].value.data;
   if(results[6].status==="fulfilled"){availabilityRequests=results[6].value.requests||[];availabilityLoadError="";}
-  if(results[7].status==="fulfilled")cashCollections=results[7].value.cash_collections||[];
   else{availabilityLoadError=results[6].reason?.message||"Owner availability API is unavailable.";}
+  if(results[7].status==="fulfilled")cashCollections=results[7].value.cash_collections||[];
   if(results[8].status==="fulfilled")payments=results[8].value.payments||[];
   if(results[9].status==="fulfilled")refunds=results[9].value.refunds||[];
   const categoryResult=await supabase.from("menu_categories").select("id,name,active,sort_order").order("sort_order");if(!categoryResult.error)menuCategories=categoryResult.data||[];
