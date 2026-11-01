@@ -359,7 +359,11 @@ if(reservationForm)reservationForm.addEventListener("submit",async e=>{
 const myOrdersRoot=document.getElementById("my-orders-list");
 function updateCustomerDashboard(signedIn){
   const nav=document.getElementById("customer-bottom-nav");
+  const auth=document.getElementById("customer-auth-form");
+  const profile=document.getElementById("customer-profile-card");
   if(nav)nav.hidden=!signedIn;
+  if(auth)auth.hidden=!!signedIn;
+  if(profile)profile.hidden=!signedIn;
   if(signedIn)showCustomerTab("profile");
 }
 function showCustomerTab(tab){
