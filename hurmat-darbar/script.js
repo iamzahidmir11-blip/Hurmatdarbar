@@ -774,15 +774,47 @@ async function loadMyOrders(expectedUserId=null){
 }
 
 const trackingForm=document.getElementById("tracking-form");
+let publicTrackingTimer=null,publicTrackingToken="";
+async function refreshPublicTracking(token,box){
+  const {data,error}=await db.rpc("track_order",{p_token:token});
+  if(error)throw error;
+  if(!data){box.replaceChildren(el("p","tracking-step","No order found for this tracking reference."));return null;}
+  box.replaceChildren();
+  const statusLabel=orderStatusLabels[data.status]||String(data.status||"").replaceAll("_"," ");
+  box.append(el("b","","Order #"+data.order_no+" · "+statusLabel));
+  (data.items||[]).forEach(it=>box.append(el("p","",it.qty+" × "+it.name+" ("+it.variant+")")));
+  box.append(el("p","tracking-total","Total "+money(data.total)));
+  if(data.rider?.name)box.append(el("p","tracking-step","Delivery partner: "+data.rider.name));
+  if(["picked_up","out_for_delivery"].includes(data.status)){
+    const loc=data.rider_location;
+    if(loc?.lat!=null&&loc?.lng!=null){
+      const map=document.createElement("iframe");
+      map.title="Live delivery partner location";
+      map.loading="lazy";map.referrerPolicy="no-referrer-when-downgrade";
+      map.src="https://maps.google.com/maps?q="+encodeURIComponent(loc.lat+","+loc.lng)+"&z=16&output=embed";
+      map.className="tracking-live-map";
+      box.append(el("p","tracking-step",loc.stale?"Last location update is delayed. Waiting for the next GPS update.":"Live rider location · updated "+new Date(loc.at).toLocaleTimeString()));
+      box.append(map);
+      const open=el("a","my-order-map","Open live location in Maps ↗");
+      open.href="https://www.google.com/maps?q="+encodeURIComponent(loc.lat+","+loc.lng);
+      open.target="_blank";open.rel="noopener";box.append(open);
+    }else box.append(el("p","tracking-step","Rider location will appear once the delivery partner starts sharing GPS."));
+  }
+  (data.history||[]).forEach(h=>box.append(el("small","tracking-step",String(h.status).replaceAll("_"," ")+" · "+new Date(h.at).toLocaleString())));
+  return data;
+}
 if(trackingForm)trackingForm.addEventListener("submit",async e=>{
- e.preventDefault();const button=trackingForm.querySelector("button[type=submit]"),box=document.getElementById("tracking-result"),token=document.getElementById("tracking-token").value.trim();
- if(token.length<16){box.textContent="Enter the complete tracking reference.";return;}
+ e.preventDefault();
+ const button=trackingForm.querySelector("button[type=submit]"),box=document.getElementById("tracking-result"),token=document.getElementById("tracking-token").value.trim();
+ if(token.length<16){box.textContent="Enter the complete tracking reference from your order confirmation.";return;}
  button.disabled=true;button.textContent="Checking…";box.replaceChildren();
- try{const {data,error}=await db.rpc("track_order",{p_token:token});if(error)throw error;if(!data){box.textContent="No order found for this tracking reference.";return;}
- const heading=el("b","", "Order #"+data.order_no+" · "+String(data.status||"").replaceAll("_"," "));
- box.append(heading);(data.items||[]).forEach(it=>box.append(el("p","",it.qty+" × "+it.name+" ("+it.variant+")")));
- box.append(el("p","tracking-total","Total "+money(data.total)));
- (data.history||[]).forEach(h=>box.append(el("small","tracking-step",String(h.status).replaceAll("_"," ")+" · "+new Date(h.at).toLocaleString())));
+ if(publicTrackingTimer)clearInterval(publicTrackingTimer);
+ publicTrackingToken=token;
+ try{
+   const data=await refreshPublicTracking(token,box);
+   if(data&&["picked_up","out_for_delivery"].includes(data.status)){
+     publicTrackingTimer=setInterval(async()=>{if(document.hidden||publicTrackingToken!==token)return;try{const latest=await refreshPublicTracking(token,box);if(!latest||!["picked_up","out_for_delivery"].includes(latest.status)){clearInterval(publicTrackingTimer);publicTrackingTimer=null;}}catch{}},8000);
+   }
  }catch(err){box.textContent="Tracking is temporarily unavailable: "+(err.message||"Try again later.");}
  finally{button.disabled=false;button.textContent="Track order ↗";}
 });
