@@ -247,7 +247,13 @@ async function pollAvailabilityStatus(){
     checkoutState();
     setTimeout(()=>{if(id===availabilityRequestId)pollAvailabilityStatus()},5000);
   }catch(error){
-    availabilityPolling=false;availabilityMessage="Waiting for Owner response. Connection will retry automatically.";
+    availabilityPolling=false;
+    const code=String(error?.message||error).toLowerCase();
+    if(code.includes("request_not_found")||code.includes("404")){
+      clearAvailability("Your old delivery request expired or is missing. Tap Check Availability again to create a fresh request.");
+      return;
+    }
+    availabilityMessage="Could not check delivery approval. Please retry. "+(code.includes("invalid_session")?"Your customer session needs to be refreshed.":"");
     checkoutState();
     setTimeout(()=>{if(id===availabilityRequestId)pollAvailabilityStatus()},7000);
   }
