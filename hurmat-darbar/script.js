@@ -477,7 +477,10 @@ function showCustomerTab(tab){
   window.scrollTo({top:0,behavior:"smooth"});
 }
 const alertsButton=document.getElementById("enable-customer-alerts");
-if(alertsButton)alertsButton.addEventListener("click",enableCustomerAlerts);\nconst disableAlertsButton=document.getElementById("disable-customer-alerts");\nif(disableAlertsButton)disableAlertsButton.addEventListener("click",disableCustomerAlerts);\nrefreshCustomerPushControls();
+if(alertsButton)alertsButton.addEventListener("click",enableCustomerAlerts);
+const disableAlertsButton=document.getElementById("disable-customer-alerts");
+if(disableAlertsButton)disableAlertsButton.addEventListener("click",disableCustomerAlerts);
+refreshCustomerPushControls();
 const customerNav=document.getElementById("customer-bottom-nav");
 if(customerNav)customerNav.addEventListener("click",e=>{const b=e.target.closest("[data-customer-tab]");if(b)showCustomerTab(b.dataset.customerTab);});
 const customerAuthForm=document.getElementById("customer-auth-form");
@@ -543,7 +546,9 @@ function setCustomerAuthMode(mode){
   document.getElementById("customer-auth-submit").textContent=signup?"Create account":"Log in";
   document.getElementById("customer-auth-switch").textContent=signup?"Already have an account? Log in":"New here? Create an account";
 }
-const forgotPasswordButton=document.getElementById("customer-forgot-password");\nif(forgotPasswordButton)forgotPasswordButton.addEventListener("click",requestCustomerPasswordReset);\nif(customerAuthForm){
+const forgotPasswordButton=document.getElementById("customer-forgot-password");
+if(forgotPasswordButton)forgotPasswordButton.addEventListener("click",requestCustomerPasswordReset);
+if(customerAuthForm){
   setCustomerAuthMode("login");
   const authSwitchButton=document.getElementById("customer-auth-switch");
   authSwitchButton.addEventListener("click",event=>{
@@ -590,7 +595,19 @@ const forgotPasswordButton=document.getElementById("customer-forgot-password");\
         customerAuthMessage("You are logged in.");
       }
       await applyCustomerGate();await loadCustomerProfile();await loadMyOrders();const {data:{user:activeUser}}=await db.auth.getUser();if(activeUser)startCustomerNotificationFeed(activeUser.id);showCustomerTab("profile");
-    }catch(error){customerAuthMessage(error.message||"Account action failed.",true);}
+    }catch(error){
+      const message=String(error?.message||"Account action failed.");
+      if(customerAuthMode==="signup"&&/already registered|user already exists|email.*already|already.*email/i.test(message)){
+        setCustomerAuthMode("login");
+        customerAuthMessage("This email already has an account. Login with your existing password, or use Forgot password if needed.",true);
+      }else if(customerAuthMode==="login"&&/invalid login credentials|invalid credentials/i.test(message)){
+        customerAuthMessage("Email or password is incorrect. Check both, or use Forgot password to reset your password.",true);
+      }else if(/email not confirmed/i.test(message)){
+        customerAuthMessage("Please verify your email using the confirmation link, then log in.",true);
+      }else{
+        customerAuthMessage(message,true);
+      }
+    }
     finally{button.disabled=false;button.textContent=customerAuthMode==="signup"?"Create account":"Log in";}
   });
 }
@@ -640,7 +657,8 @@ function renderMyOrders(data,payments,refunds=[]){
     if(proofs.length)card.append(el("p","my-order-meta","UPI proof: "+proofs[0].status+(proofs[0].review_note?" · "+proofs[0].review_note:"")));
     const refund=refunds.find(r=>r.order_id===o.id);
     if(refund){
-      card.append(el("p","my-order-meta","Refund: "+refund.status.replaceAll("_"," ")+" · "+money(refund.amount)));\n      if(Number(refund.cancellation_fee)>0)card.append(el("p","my-order-meta","6% cancellation charge: "+money(refund.cancellation_fee)));
+      card.append(el("p","my-order-meta","Refund: "+refund.status.replaceAll("_"," ")+" · "+money(refund.amount)));
+      if(Number(refund.cancellation_fee)>0)card.append(el("p","my-order-meta","6% cancellation charge: "+money(refund.cancellation_fee)));
       if(refund.refund_reference)card.append(el("p","my-order-meta","Refund reference: "+refund.refund_reference));
       if(refund.owner_note)card.append(el("p","my-order-meta","Refund update: "+refund.owner_note));
     }else if(["cancelled","rejected","delivery_failed"].includes(o.status)&&o.payment_status==="paid"){
