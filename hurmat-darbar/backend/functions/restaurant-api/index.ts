@@ -86,16 +86,9 @@ Deno.serve(async (req: Request) => {
       }
       if (view === "available_orders") {
         if (!roles.has("rider")) return reply({ error: "forbidden" }, 403);
-        const { data: rider, error: riderError } = await supabase.from("riders")
-          .select("is_online").eq("user_id", user.id).maybeSingle();
-        if (riderError || !rider) return reply({ error: "rider_profile_unavailable" }, 404);
-        if (!rider.is_online) return reply({ orders: [], rider_offline: true });
-        const { data, error } = await supabase.from("orders")
-          .select("id,order_no,customer_name,address_text,lat,lng,payment_method,payment_status,status,total,created_at,order_items(id,item_name,variant_label,qty)")
-          .is("rider_id", null).eq("status", "ready_for_pickup")
-          .order("created_at", { ascending: true }).limit(50);
+        const { data, error } = await supabase.rpc("get_available_delivery_orders");
         if (error) return reply({ error: "available_orders_unavailable" }, 500);
-        return reply({ orders: data ?? [], rider_offline: false });
+        return reply(data ?? { orders: [], rider_offline: true });
       }
       if (view === "my_orders") {
         const { data, error } = await supabase.from("orders")
