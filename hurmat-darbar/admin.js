@@ -15,7 +15,7 @@ const statusNames = {
   ready_for_pickup:"Ready for pickup", picked_up:"Picked up", out_for_delivery:"Out for delivery",
   delivered:"Delivered", cancelled:"Cancelled", rejected:"Rejected", delivery_failed:"Delivery failed"
 };
-const tabs = [["home","⌂","Overview"],["orders","▤","Orders"],["menu","▦","Menu"],["inventory","▣","Inventory"],["availability","✓","Delivery checks"],["payments","₹","Payments"],["refunds","↩","Refunds"],["reservations","◷","Bookings"],["riders","♧","Riders"],["reports","▥","Reports"],["settings","⚙","Store setup"],["alerts","♢","Alerts"]];
+const tabs = [["home","⌂","Dashboard"],["orders","▤","Orders"],["tracking","⌖","Live"],["riders","♧","Riders"],["profile","♙","Profile"],["menu","▦","Menu"],["inventory","▣","Inventory"],["availability","✓","Delivery checks"],["payments","₹","Payments"],["refunds","↩","Refunds"],["reservations","◷","Bookings"],["reports","▥","Reports"],["settings","⚙","Store setup"],["alerts","♢","Alerts"]];
 // Temporary development-only UI preview. Live data and all write operations remain protected.
 const DEVELOPMENT_PREVIEW = false;
 let user=null, role=null, page="home", orders=[], menuItems=[], menuCategories=[], reservations=[], riders=[], riderLocations=[], notifications=[], availabilityRequests=[], cashCollections=[], availabilityLoadError="", payments=[], refunds=[], settings=null, channel=null, busy=false, availabilityRefreshTimer=null;
@@ -91,12 +91,12 @@ function nav(){
 function header(){
   const open=!!settings?.is_open;
   const unread=notifications.filter(n=>!n.is_read).length;
-  const moreTabs=tabs.slice(5);
-  const status=DEVELOPMENT_PREVIEW?'<span class="pill">PREVIEW MODE</span>':'<button class="outlet-state '+(open?'is-open':'is-paused')+'" id="outlet-toggle" data-open="'+String(open)+'"><i></i>'+(open?'Accepting orders':'Orders paused')+'</button><span class="pill">'+esc(role||"STAFF").toUpperCase()+'</span><button class="btn ghost sm" id="signout">Sign out</button>';
+  const moreTabs=tabs.filter(t=>!["home","orders","tracking","riders","profile"].includes(t[0]));
+  const status=DEVELOPMENT_PREVIEW?'<span class="pill">PREVIEW MODE</span>':'<span class="pill owner-role-pill">'+esc(role||"STAFF").toUpperCase()+'</span>';
   return '<header class="partner-topbar"><div class="topbar-brand"><div class="logo"><img src="../assets/hurmat-logo-repo.png" alt="Hurmat Darbar"></div><div><b>HURMAT OWNER</b><small>'+(DEVELOPMENT_PREVIEW?'DEVELOPMENT WORKSPACE':'LIVE RESTAURANT OPERATIONS')+'</small></div></div><div class="owner-header-actions">'+status+
   '<button class="header-icon notification-trigger" id="owner-notifications" aria-label="Notifications"><span>♧</span>'+(unread?'<i>'+Math.min(unread,99)+'</i>':'')+'</button>'+
   '<button class="header-icon menu-trigger" id="owner-menu" aria-label="More options" aria-expanded="false"><span>☰</span></button>'+
-  '<div class="owner-more-menu" id="owner-more-menu" hidden>'+moreTabs.map(t=>'<button data-tab="'+t[0]+'" class="'+(page===t[0]?"on":"")+'"><span>'+t[1]+'</span>'+t[2]+'</button>').join("")+'</div></div></header>';
+  '<div class="owner-more-menu" id="owner-more-menu" hidden>'+'<div class="menu-panel-head"><b>QUICK CONTROLS</b><small>'+esc(role||"STAFF").toUpperCase()+' ACCESS</small></div>'+(DEVELOPMENT_PREVIEW?"":'<button class="menu-control" id="outlet-toggle" data-open="'+String(open)+'"><span class="menu-item-icon">◉</span><span class="menu-item-label">Store status</span><strong>'+(open?"Accepting orders":"Paused")+'</strong></button>')+'<div class="menu-divider"></div>'+moreTabs.map(t=>'<button data-tab="'+t[0]+'" class="'+(page===t[0]?"on":"")+'"><span class="menu-item-icon">'+t[1]+'</span><span class="menu-item-label">'+t[2]+'</span><span class="menu-item-arrow">›</span></button>').join("")+(DEVELOPMENT_PREVIEW?"":'<div class="menu-divider"></div><button id="signout" class="menu-signout"><span class="menu-item-icon">↪</span><span class="menu-item-label">Sign out</span></button>')+'</div></div></header>';
 }
 function shell(title,desc,content){
   const previewNotice=DEVELOPMENT_PREVIEW?'<div class="notice" style="margin:16px 0 20px"><b>Development preview</b> · Login temporarily hidden. Live restaurant data and saving changes are disabled. Phone OTP + Admin approval will be added before launch.</div>':"";
@@ -177,6 +177,20 @@ function ridersView(){
   const cashRows=cashCollections.map(c=>'<article class="card" style="margin:10px 0"><div class="row"><b>Order #'+esc(c.orders?.order_no||"—")+'</b><span class="tag '+(c.handed_over?"s-served":"s-new")+'">'+(c.handed_over?"Handed over":"Cash with rider")+'</span></div><p class="mute">'+esc(c.rider_name||"Rider")+' · '+money(c.amount)+' · '+new Date(c.collected_at).toLocaleString()+'</p>'+(c.handed_over?'<p class="mute">Received '+(c.handed_over_at?new Date(c.handed_over_at).toLocaleString():"")+'</p>':'<button class="btn sm" data-cash-handover="'+esc(c.order_id)+'">Confirm cash received</button>')+'</article>').join("")||empty("No COD cash collections recorded yet.");
   const locationRows=riderLocations.map(p=>{const rider=riders.find(r=>r.user_id===p.rider_id);return '<div class="item-row"><div class="item-meta"><b>'+esc(rider?.name||"Rider")+' · Order #'+esc(p.order_no||"—")+'</b><span class="mute">GPS '+esc(new Date(p.created_at).toLocaleTimeString())+' · accuracy '+esc(Math.round(Number(p.accuracy||0)))+'m</span></div><a class="btn sm" target="_blank" rel="noopener" href="https://www.google.com/maps?q='+encodeURIComponent(p.lat+","+p.lng)+'">View live location ↗</a></div>';}).join("")||empty("No recent GPS location. Rider must be online and share location during an active delivery.");
   return create+'<section class="partner-panel"><div class="panel-heading"><div><h2>Registered riders</h2><p>Online availability updates from the delivery app.</p></div></div>'+list+'</section><section class="partner-panel" style="margin-top:14px"><div class="panel-heading"><div><h2>Live GPS tracker</h2><p>Recent rider positions for active deliveries. Refreshes automatically.</p></div><span class="pill">GPS</span></div>'+locationRows+'</section><section class="partner-panel" style="margin-top:14px"><div class="panel-heading"><div><h2>COD cash reconciliation</h2><p>Cash recorded by riders after customer delivery.</p></div><span class="pill">'+cashCollections.filter(c=>!c.handed_over).length+' pending</span></div>'+cashRows+'</section>';
+}
+function trackingView(){
+  const rows=riderLocations.map(p=>{
+    const rider=riders.find(r=>r.user_id===p.rider_id);
+    const stamp=p.created_at?new Date(p.created_at):null;
+    const age=stamp?Math.max(0,Math.round((Date.now()-stamp.getTime())/60000)):null;
+    return '<article class="tracking-card"><div class="tracking-pin">⌖</div><div class="tracking-copy"><b>'+esc(rider?.name||"Delivery partner")+' · Order #'+esc(p.order_no||"—")+'</b><span>Last GPS update '+(age===null?"unknown":age===0?"just now":age+" min ago")+' · accuracy '+esc(Math.round(Number(p.accuracy||0)))+'m</span><small>'+esc(stamp?stamp.toLocaleString():"")+'</small></div><a class="btn sm" target="_blank" rel="noopener" href="https://www.google.com/maps?q='+encodeURIComponent(p.lat+","+p.lng)+'">Open map ↗</a></article>';
+  }).join("");
+  const online=riders.filter(r=>r.is_online).length;
+  return '<section class="tracking-summary"><div><span class="eyebrow">DELIVERY OPERATIONS</span><h2>Live rider locations</h2><p>Location updates refresh automatically while this screen is open. GPS is shared only for active deliveries.</p></div><div class="tracking-count"><b>'+online+'</b><span>Riders online</span></div></section><section class="partner-panel"><div class="panel-heading"><div><h2>Active GPS signals</h2><p>Latest position reported by each active rider delivery</p></div><span class="pill">AUTO REFRESH · 8 SEC</span></div>'+(rows||empty("No active GPS location is available yet. A rider must be online, accept an order and start delivery location sharing."))+'</section><section class="partner-panel"><div class="panel-heading"><div><h2>Delivery team</h2><p>Current online status from Hurmat Delivery</p></div><button class="text-action" data-go="riders">Manage riders ↗</button></div>'+(riders.map(r=>'<div class="item-row"><div class="item-meta"><b>'+esc(r.name||"Rider")+'</b><span class="mute">'+esc(r.phone||"No phone on file")+'</span></div><span class="tag '+(r.is_online?"s-ready":"s-served")+'">'+(r.is_online?"Online":"Offline")+'</span></div>').join("")||empty("No riders registered."))+'</section>';
+}
+function profileView(){
+  const meta=user?.user_metadata||{};
+  return '<section class="profile-hero"><div class="profile-avatar">'+esc((meta.full_name||user?.email||"O").trim().charAt(0).toUpperCase())+'</div><div><span class="eyebrow">HURMAT OWNER ACCOUNT</span><h2>My Profile</h2><p>Update your display details. Login email and access role are managed securely.</p></div></section><section class="partner-panel"><form id="owner-profile-form"><label>Full name</label><input id="owner-profile-name" maxlength="80" value="'+esc(meta.full_name||meta.name||"")+'" placeholder="Your full name"><label>Phone number</label><input id="owner-profile-phone" maxlength="20" value="'+esc(meta.phone||"")+'" placeholder="Phone number"><label>Login email</label><input value="'+esc(user?.email||"")+'" disabled><label>Access role</label><input value="'+esc(role||"")+'" disabled><button class="btn" type="submit">Save profile</button></form></section><section class="partner-panel"><div class="panel-heading"><div><h2>Account security</h2><p>Signed-in account and session</p></div></div><div class="item-row"><span class="mute">Last sign in</span><b>'+esc(user?.last_sign_in_at?new Date(user.last_sign_in_at).toLocaleString():"Current session")+'</b></div><div class="item-row"><span class="mute">Account ID</span><b>Protected</b></div></section>';
 }
 function reportsView(){
   const now=new Date(),days=[];
@@ -292,9 +306,9 @@ function settingsView(){
 function riderFormEditing(){return !!document.getElementById("rider-create-form");}
 function render(){
   nav();
-  const titles={home:["Overview","Live restaurant operations and business pulse."],orders:["Order desk","Manage incoming orders through kitchen and delivery stages."],availability:["Delivery checks","Review every customer delivery request and respond YES or NO."],payments:["Payments","Verify UPI references and customer payment screenshots."],refunds:["Refunds","Review cancellations and record verified customer refunds."],menu:["Menu management","Control dishes, categories, prices, photos and availability."],inventory:["Inventory","Physical stock counts synced with customer ordering."],reservations:["Bookings","Customer reservation requests."],riders:["Delivery team","Rider accounts and availability."],reports:["Reports","Sales trends and top-selling menu items."],settings:["Store setup","Restaurant profile, operating status, delivery and payment configuration."],alerts:["Notifications","Live operational alerts and order updates."]};
+  const titles={tracking:["Live tracking","Live rider positions and active delivery locations."],profile:["My Profile","Your secure owner account details."],home:["Overview","Live restaurant operations and business pulse."],orders:["Order desk","Manage incoming orders through kitchen and delivery stages."],availability:["Delivery checks","Review every customer delivery request and respond YES or NO."],payments:["Payments","Verify UPI references and customer payment screenshots."],refunds:["Refunds","Review cancellations and record verified customer refunds."],menu:["Menu management","Control dishes, categories, prices, photos and availability."],inventory:["Inventory","Physical stock counts synced with customer ordering."],reservations:["Bookings","Customer reservation requests."],riders:["Delivery team","Rider accounts and availability."],reports:["Reports","Sales trends and top-selling menu items."],settings:["Store setup","Restaurant profile, operating status, delivery and payment configuration."],alerts:["Notifications","Live operational alerts and order updates."]};
   const t=titles[page]||titles.home;
-  let content=page==="home"?homeView():page==="orders"?ordersView():page==="availability"?availabilityRequestsView():page==="payments"?paymentsView():page==="refunds"?refundsView():page==="menu"?menuView():page==="inventory"?inventoryView():page==="reservations"?reservationsView():page==="riders"?ridersView():page==="reports"?reportsView():page==="settings"?settingsView():alertsView();
+  let content=page==="home"?homeView():page==="orders"?ordersView():page==="tracking"?trackingView():page==="profile"?profileView():page==="availability"?availabilityRequestsView():page==="payments"?paymentsView():page==="refunds"?refundsView():page==="menu"?menuView():page==="inventory"?inventoryView():page==="reservations"?reservationsView():page==="riders"?ridersView():page==="reports"?reportsView():page==="settings"?settingsView():alertsView();
   shell(t[0],t[1],content);
   bindActions();
 }
@@ -545,6 +559,15 @@ function bindActions(){
       toast(messages[err.message]||err.message||"Rider account could not be created.",true);
     }finally{button.disabled=false;button.textContent="Create rider account";}
   };
+  const profileForm=document.getElementById("owner-profile-form");
+  if(profileForm)profileForm.onsubmit=async e=>{
+    e.preventDefault();
+    const full_name=document.getElementById("owner-profile-name").value.trim();
+    const phone=document.getElementById("owner-profile-phone").value.trim();
+    if(full_name.length<2||full_name.length>80||phone.length>20){toast("Enter a valid name and phone number.",true);return;}
+    try{const {data,error}=await supabase.auth.updateUser({data:{...(user?.user_metadata||{}),full_name,phone}});if(error)throw error;user=data.user||user;toast("Profile updated.");render();}
+    catch(error){toast(error.message||"Profile could not be updated.",true);}
+  };
   const settingsForm=document.getElementById("settings-form");
   if(settingsForm)settingsForm.onsubmit=async e=>{
     e.preventDefault();
@@ -611,7 +634,7 @@ async function startApp(){
         const result=await api("availability"),next=result.requests||[];
         if(JSON.stringify(next)!==JSON.stringify(availabilityRequests)){availabilityRequests=next;changed=true;}
       }
-      if(page==="riders"){
+      if(page==="riders"||page==="tracking"){
         const riderResult=await api("riders"),nextRiders=riderResult.riders||[],nextLocations=riderResult.locations||[];
         if(JSON.stringify(nextRiders)!==JSON.stringify(riders)||JSON.stringify(nextLocations)!==JSON.stringify(riderLocations)){riders=nextRiders;riderLocations=nextLocations;changed=true;}
       }
