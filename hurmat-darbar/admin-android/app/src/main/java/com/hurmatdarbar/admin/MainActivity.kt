@@ -4,7 +4,7 @@ import android.app.Activity
 import android.os.Bundle
 import android.graphics.Color
 import android.webkit.CookieManager
-import android.webkit.SslErrorHandler
+import android.net.http.SslErrorHandler
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
