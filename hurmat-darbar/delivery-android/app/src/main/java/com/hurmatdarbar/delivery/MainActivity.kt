@@ -4,6 +4,8 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.content.Intent
 import android.net.Uri
 import android.Manifest
@@ -40,7 +42,7 @@ class MainActivity : Activity() {
  private var sharingOrderId:String?=null
  private lateinit var root:LinearLayout
  private lateinit var status:TextView
- private val ink=Color.rgb(33,31,24); private val gold=Color.rgb(181,138,75); private val paper=Color.rgb(245,241,232)
+ private val ink=Color.rgb(25,43,33); private val gold=Color.rgb(190,151,83); private val paper=Color.rgb(244,242,235); private val forest=Color.rgb(22,57,39)
  override fun onCreate(savedInstanceState:Bundle?) { super.onCreate(savedInstanceState); restoreSessionOrLogin() }
  private fun sessionPrefs()=EncryptedSharedPreferences.create(
   this,"hurmat_rider_session",
@@ -69,15 +71,23 @@ class MainActivity : Activity() {
    }catch(ex:Exception){runOnUiThread{clearSession();login();status.text="Please sign in again. "+message(ex)}}
   }
  }
+ private fun rounded(color:Int,radius:Float=18f)=GradientDrawable().apply { setColor(color); cornerRadius=radius }
  private fun setup(title:String) {
-  root=LinearLayout(this).apply { orientation=1; setPadding(22,24,22,24); setBackgroundColor(paper) }
-  root.addView(TextView(this).apply { text="H U R M A T   D A R B A R"; textSize=13f; setTextColor(gold) })
-  root.addView(TextView(this).apply { text=title; textSize=27f; setTextColor(ink); setPadding(0,12,0,10) })
-  status=TextView(this).apply { text="Ready"; textSize=13f; setTextColor(Color.DKGRAY); setPadding(0,4,0,12) }; root.addView(status)
-  setContentView(ScrollView(this).apply { addView(root) })
+  root=LinearLayout(this).apply { orientation=1; setPadding(18,20,18,28); setBackgroundColor(paper) }
+  val hero=LinearLayout(this).apply { orientation=1; setPadding(20,18,20,18); background=rounded(forest,24f); elevation=4f }
+  hero.addView(TextView(this).apply { text="H U R M A T   D A R B A R"; textSize=11f; letterSpacing=1.6f; setTextColor(gold); setTypeface(null,Typeface.BOLD) })
+  hero.addView(TextView(this).apply { text=title; textSize=27f; setTextColor(Color.WHITE); setTypeface(null,Typeface.BOLD); setPadding(0,10,0,4) })
+  hero.addView(TextView(this).apply { text="RIDER DELIVERY CONSOLE"; textSize=10f; letterSpacing=1.4f; setTextColor(Color.rgb(204,218,204)) })
+  root.addView(hero,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=16})
+  status=TextView(this).apply { text="Connecting to delivery system…"; textSize=12f; setTextColor(ink); setPadding(4,8,4,14) }; root.addView(status)
+  setContentView(ScrollView(this).apply { isFillViewport=true; addView(root) })
  }
- private fun label(s:String,size:Float=14f)=TextView(this).apply { text=s; textSize=size; setTextColor(ink); setPadding(0,6,0,6) }
- private fun button(s:String,action:()->Unit)=Button(this).apply { text=s; isAllCaps=false; setOnClickListener { action() } }
+ private fun label(s:String,size:Float=14f)=TextView(this).apply { text=s; textSize=size; setTextColor(ink); setPadding(0,7,0,7) }
+ private fun button(s:String,action:()->Unit)=Button(this).apply {
+  text=s; isAllCaps=false; textSize=13f; setTextColor(Color.WHITE); background=rounded(forest,14f)
+  minHeight=48; setPadding(16,8,16,8); elevation=2f
+  setOnClickListener { action() }
+ }
  private fun field(s:String,secret:Boolean=false)=EditText(this).apply { hint=s; setSingleLine(true); if(secret) inputType=129 }
  private fun login() {
   setup("Rider Sign In")
@@ -150,7 +160,7 @@ class MainActivity : Activity() {
   } catch(ex:Exception){runOnUiThread{status.text=message(ex)}} }
  }
  private fun renderAvailable(o:JSONObject) {
-  val card=LinearLayout(this).apply{orientation=1;setPadding(16,14,16,14);setBackgroundColor(Color.WHITE)}
+  val card=LinearLayout(this).apply{orientation=1;setPadding(16,14,16,14);background=rounded(Color.WHITE,20f);elevation=3f}
   val id=o.optString("id")
   card.addView(label("ORDER #"+o.optString("order_no")+"  ·  READY FOR PICKUP",16f))
   card.addView(label(o.optString("customer_name")+"\n"+o.optString("address_text")))
@@ -169,7 +179,7 @@ class MainActivity : Activity() {
   }
  }
  private fun render(o:JSONObject) {
-  val card=LinearLayout(this).apply{orientation=1;setPadding(14,12,14,12);setBackgroundColor(Color.WHITE)}
+  val card=LinearLayout(this).apply{orientation=1;setPadding(16,14,16,14);background=rounded(Color.WHITE,20f);elevation=3f}
   val id=o.optString("id"); val state=o.optString("status")
   val stageLabel=when(state){"pending_confirmation"->"Waiting for restaurant confirmation";"confirmed"->"Confirmed • waiting for kitchen";"preparing"->"Kitchen is preparing";"ready_for_pickup"->"Ready for pickup";"picked_up"->"Picked up";"out_for_delivery"->"Out for delivery";"delivered"->"Delivered";"delivery_failed"->"Delivery failed";"cancelled"->"Cancelled";"rejected"->"Rejected";else->state.replace('_',' ')}
   card.addView(label("Order #"+o.optString("order_no")+" • "+stageLabel,17f))
