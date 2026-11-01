@@ -195,7 +195,12 @@ Deno.serve(async (req: Request) => {
             latest.set(point.rider_id, { ...point, order_no: order.order_no });
           }
         }
-        return reply({ riders: data ?? [], locations: [...latest.values()] });
+        const riders = (data ?? []).map((rider: Record<string, any>) => ({
+          ...rider,
+          is_online: Boolean(rider.is_online && rider.last_seen &&
+            new Date(rider.last_seen).getTime() >= Date.now() - 15 * 60 * 1000),
+        }));
+        return reply({ riders, locations: [...latest.values()] });
       }
       if (![...roles].some((r) => ["owner", "manager", "kitchen", "delivery_manager", "rider"].includes(r))) return reply({ error: "forbidden" }, 403);
       let orderQuery = supabase.from("orders")
