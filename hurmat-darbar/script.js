@@ -521,7 +521,7 @@ function renderMyOrders(data,payments,refunds=[]){
     if(proofs.length)card.append(el("p","my-order-meta","UPI proof: "+proofs[0].status+(proofs[0].review_note?" · "+proofs[0].review_note:"")));
     const refund=refunds.find(r=>r.order_id===o.id);
     if(refund){
-      card.append(el("p","my-order-meta","Refund: "+refund.status.replaceAll("_"," ")+" · "+money(refund.amount)));
+      card.append(el("p","my-order-meta","Refund: "+refund.status.replaceAll("_"," ")+" · "+money(refund.amount)));\n      if(Number(refund.cancellation_fee)>0)card.append(el("p","my-order-meta","6% cancellation charge: "+money(refund.cancellation_fee)));
       if(refund.refund_reference)card.append(el("p","my-order-meta","Refund reference: "+refund.refund_reference));
       if(refund.owner_note)card.append(el("p","my-order-meta","Refund update: "+refund.owner_note));
     }else if(["cancelled","rejected","delivery_failed"].includes(o.status)&&o.payment_status==="paid"){
