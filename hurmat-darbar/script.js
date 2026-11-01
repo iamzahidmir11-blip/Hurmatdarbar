@@ -653,6 +653,12 @@ function renderMyOrders(data,payments,refunds=[]){
     head.append(title,tag);card.append(head,el("p","my-order-meta",new Date(o.created_at).toLocaleString()+" · "+money(o.total)));
     (o.order_items||[]).forEach(i=>card.append(el("p","my-order-line",i.qty+" × "+i.item_name+" ("+i.variant_label+")")));
     card.append(el("p","my-order-meta","Payment: "+o.payment_method+" · "+(o.payment_status==="paid"?"Paid":o.payment_status==="cod_pending"?"Cash on delivery":"Payment pending")));
+    if(o.delivery_code){
+      const codeRow=el("div","my-order-proof-form"),codeText=el("strong","my-order-meta","Delivery verification code: "+o.delivery_code);
+      const copyCode=el("button","btn ghost sm","Copy code");copyCode.type="button";
+      copyCode.onclick=async()=>{try{await navigator.clipboard.writeText(o.delivery_code);copyCode.textContent="Copied ✓";}catch{window.prompt("Show this code to your rider",o.delivery_code);}};
+      codeRow.append(codeText,copyCode);card.append(codeRow,el("small","my-order-meta","Share this code with your rider only when your order arrives. It confirms delivery."));
+    }
     const proofs=payments.filter(p=>p.order_id===o.id);
     if(proofs.length)card.append(el("p","my-order-meta","UPI proof: "+proofs[0].status+(proofs[0].review_note?" · "+proofs[0].review_note:"")));
     const refund=refunds.find(r=>r.order_id===o.id);
